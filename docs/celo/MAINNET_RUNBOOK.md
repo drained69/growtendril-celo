@@ -67,9 +67,11 @@ cast wallet new
 | Wallet | Variable | Lives in | Fund with |
 |---|---|---|---|
 | Deployer | `CELO_DEPLOYER_PRIVATE_KEY` | Local `.env` only | About 2.4 CELO |
-| Agent (operator) | `CELO_AGENT_PRIVATE_KEY` | Local `.env` and Railway | About 1 CELO, plus a few USDC for x402 research |
+| Agent (operator) | `CELO_AGENT_PRIVATE_KEY` | Local `.env` and Railway | 1 to 2 CELO for gas, plus a few USDC for x402 research |
 
-Add both keys and `CELO_ATTRIBUTION_CODE` to `.env` yourself. Never paste a private key into a chat. Back both keys up offline.
+Each agent transaction costs about 0.04 CELO, so 1 CELO covers roughly 25 of them. Add both keys and `CELO_ATTRIBUTION_CODE` to `.env` yourself. Never paste a private key into a chat. Back both keys up offline.
+
+The **agent wallet** is the one Loops scores. Give Loops the agent address, never the deployer, and keep the same agent wallet for the whole event. If you join a Loops team, your tag changes: update `CELO_ATTRIBUTION_CODE` and push the settings again.
 
 ## 5. Deploy the contracts (Real money)
 
@@ -85,7 +87,15 @@ It must say `"ready": true`. The last estimate was 7.62M gas, about 1.54 CELO, w
 npm run celo:deploy -- --broadcast --confirm-mainnet
 ```
 
-If it stops partway, run the same command again. It resumes from `contracts/deployments/celo-mainnet.json`. Copy the three printed addresses into `.env`:
+If it stops partway, run the same command again. It resumes from `contracts/deployments/celo-mainnet.json`.
+
+After deploying, it publishes the contract source to Sourcify. To also show the source on Celoscan, put a free Etherscan API key in `.env` as `ETHERSCAN_API_KEY` before deploying. The output reports each contract as `verified` or `failed`. If any failed, retry without redeploying:
+
+```bash
+npm run celo:deploy -- --verify
+```
+
+Copy the three printed addresses into `.env`:
 
 ```
 CELO_REWARDS_ESCROW=
@@ -159,11 +169,16 @@ On the Wallet page:
 3. Confirm the Wallet page shows it as settled, and open the transaction on Celoscan.
 4. Run `verifyTx` from `@celo/attribution-tags` on the hash to confirm your tag counts.
 
-For the Stablecoin Corridors track, make one Textile conversion from the **tagged server wallet** to an outside recipient. Altana relay attribution is unconfirmed, so do not rely on it for your counted transaction until Altana confirms it.
+For the Stablecoin Corridors track, make one Textile conversion to an outside recipient from your workspace contract. The owner approves it in their wallet, and the agent wallet converts and delivers in one tagged transaction. It needs two things first:
+
+1. **A Textile partner API key.** Textile only quotes a contract wallet when the request carries a partner key. Ask Textile for one, set it as `TEXTILE_API_KEY`, and push the settings. Without it, the payment stops with "Add a Textile API key to convert from a smart wallet" and no funds move.
+2. **USD₮ in the workspace contract.** Conversions sell USD₮, not USDC. Deposit a few USD₮ from the Wallet page.
+
+Each workspace keeps the wallet it was first linked to, so do not attach the server wallet to the workspace you use for the contract. Altana relay attribution is unconfirmed, so do not rely on it for your counted transaction until Altana confirms it.
 
 ## 12. Submit
 
-Include the public repo, the ERC-8004 ID, agent wallet, Self proof, attribution tag, mainnet transaction links, the outside user's consent and result, and a short video. Enter at most the tracks you actually demonstrated: **Stablecoin Corridors**, **Self Agent ID**, and **Altana Agent Wallets** if its flow works live. Do not claim Agent Vault.
+Include the public repo (`https://github.com/drained69/growtendril-celo`), the ERC-8004 ID, the agent wallet address, Self proof, attribution tag, mainnet transaction links, the outside user's consent and result, and a short video. Enter at most the tracks you actually demonstrated: **Stablecoin Corridors**, **Self Agent ID**, and **Altana Agent Wallets** if its flow works live. Do not claim Agent Vault.
 
 ## If something goes wrong
 

@@ -4,6 +4,7 @@
  *   npm run celo:deploy                                  read-only preflight; sends nothing
  *   npm run celo:deploy -- --rehearse                    full deployment and a real-USDC payment on a private local fork
  *   npm run celo:deploy -- --broadcast --confirm-mainnet real, tagged mainnet transactions that spend CELO gas
+ *   npm run celo:deploy -- --verify                      retry source verification of a finished deployment
  *
  * The key is read from CELO_DEPLOYER_PRIVATE_KEY or CELO_AGENT_PRIVATE_KEY and is never printed.
  * Progress is saved after every transaction, so an interrupted deployment resumes without duplicates.
@@ -12,7 +13,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
-import { createPublicClient, createTestClient, createWalletClient, encodeDeployData, erc20Abi, formatEther, http, keccak256, pad, parseEther, toHex, type Abi, type Address, type Hash, type Hex } from "viem";
+import { createPublicClient, createTestClient, createWalletClient, encodeAbiParameters, encodeDeployData, erc20Abi, formatEther, http, keccak256, pad, parseEther, toHex, type Abi, type Address, type Hash, type Hex } from "viem";
 import { celo } from "viem/chains";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { toDataSuffix } from "@celo/attribution-tags";
@@ -26,11 +27,12 @@ const RECORD = "contracts/deployments/celo-mainnet.json";
 const USDC_BALANCE_SLOT = 9n;
 const PAYOUT_ADDRESSES = Object.values(PAYOUT_TOKENS).map((token) => token.address);
 const args = process.argv.slice(2);
-const known = new Set(["--rehearse", "--broadcast", "--confirm-mainnet"]);
-if (args.some((arg) => !known.has(arg))) throw new Error("Usage: npm run celo:deploy -- [--rehearse | --broadcast --confirm-mainnet]");
+const known = new Set(["--rehearse", "--broadcast", "--confirm-mainnet", "--verify"]);
+if (args.some((arg) => !known.has(arg))) throw new Error("Usage: npm run celo:deploy -- [--rehearse | --broadcast --confirm-mainnet | --verify]");
 const rehearse = args.includes("--rehearse");
 const broadcast = args.includes("--broadcast");
-if (rehearse && broadcast) throw new Error("Choose either --rehearse or --broadcast");
+const verifyOnly = args.includes("--verify");
+if ([rehearse, broadcast, verifyOnly].filter(Boolean).length > 1) throw new Error("Choose one of --rehearse, --broadcast or --verify");
 if (broadcast && !args.includes("--confirm-mainnet")) throw new Error("A real deployment also needs --confirm-mainnet");
 
 type Name = "OutcomeRewardsEscrow" | "GrowthFactory" | "GrowthLedger";
@@ -172,8 +174,40 @@ async function rehearsal() {
   }
 }
 
+/** Publishes source to Sourcify, and to Celoscan when ETHERSCAN_API_KEY is set (forge reads it from the environment). */
+async function verifySources(suite: {escrow: Address; factory: Address; ledger: Address}) {
+  const implementation = await clientFor(CELO.rpcUrl).readContract({address: suite.factory, abi: GROWTH_FACTORY_ABI as Abi, functionName: "implementation"}) as Address;
+  const targets: [string, Address, string, Abi, readonly unknown[]][] = [
+    ["OutcomeRewardsEscrow", suite.escrow, "src/OutcomeRewardsEscrow.sol", abiOf.OutcomeRewardsEscrow, argsFor("OutcomeRewardsEscrow")],
+    ["GrowthFactory", suite.factory, "src/protocol/GrowthFactory.sol", abiOf.GrowthFactory, argsFor("GrowthFactory")],
+    ["GrowthLedger", suite.ledger, "src/protocol/GrowthLedger.sol", abiOf.GrowthLedger, argsFor("GrowthLedger", suite.factory)],
+    ["GrowthWorkspace", implementation, "src/protocol/GrowthWorkspace.sol", GROWTH_WORKSPACE_ABI as Abi, [suite.factory, CELO.usdc, USDT.address, TEXTILE_REACTOR]],
+  ];
+  const verifiers = ["sourcify", ...(process.env.ETHERSCAN_API_KEY?.trim() ? ["etherscan"] : [])];
+  const results: Record<string, Record<string, string>> = {};
+  for (const [name, address, source, abi, ctorArgs] of targets) {
+    const inputs = abi.find((item) => item.type === "constructor")?.inputs ?? [];
+    const encoded = encodeAbiParameters(inputs, ctorArgs as unknown[]);
+    results[name] = {address};
+    for (const verifier of verifiers) {
+      const run = spawnSync("forge", ["verify-contract", address, `${source}:${name}`, "--chain", String(CELO.chainId), "--verifier", verifier, "--constructor-args", encoded, "--watch"], {cwd: "contracts", encoding: "utf8", timeout: 180_000});
+      const detail = `${run.stdout ?? ""}${run.stderr ?? ""}`.trim().split("\n").filter(Boolean).pop() ?? "no output";
+      results[name][verifier === "etherscan" ? "celoscan" : verifier] = run.status === 0 ? "verified" : `failed: ${detail.slice(0, 160)}`;
+    }
+  }
+  return results;
+}
+
 if (rehearse) {
   await rehearsal();
+  process.exit(0);
+}
+
+if (verifyOnly) {
+  const record = existsSync(RECORD) ? JSON.parse(readFileSync(RECORD, "utf8")) as {status?: string; contracts?: Saved} : null;
+  const c = record?.contracts;
+  if (record?.status !== "deployed" || !c?.OutcomeRewardsEscrow?.address || !c.GrowthFactory?.address || !c.GrowthLedger?.address) throw new Error(`No finished deployment in ${RECORD}`);
+  say({verification: await verifySources({escrow: c.OutcomeRewardsEscrow.address, factory: c.GrowthFactory.address, ledger: c.GrowthLedger.address})});
   process.exit(0);
 }
 
@@ -207,7 +241,5 @@ const base = {network: "Celo mainnet", chainId: CELO.chainId, deployer, compiler
 const write = (status: string, contracts: Saved) => writeFileSync(RECORD, `${JSON.stringify({...base, status, contracts}, null, 2)}\n`);
 const suite = await deploySuite(CELO.rpcUrl, key, code, saved, (next) => write("in_progress", next));
 write("deployed", saved);
-for (const [name, address, source] of [["OutcomeRewardsEscrow", suite.escrow, "src/OutcomeRewardsEscrow.sol"], ["GrowthFactory", suite.factory, "src/protocol/GrowthFactory.sol"], ["GrowthLedger", suite.ledger, "src/protocol/GrowthLedger.sol"]] as const) {
-  spawnSync("forge", ["verify-contract", address, `${source}:${name}`, "--chain", String(CELO.chainId), "--verifier", "sourcify"], {cwd: "contracts", encoding: "utf8"});
-}
 say({status: "deployed", contracts: suite, explorer: `${CELO.explorer}/address/${suite.factory}`, setOnWebService: {CELO_REWARDS_ESCROW: suite.escrow, CELO_GROWTH_FACTORY: suite.factory, CELO_GROWTH_LEDGER: suite.ledger}});
+say({verification: await verifySources(suite), retry: "If any verification failed, run npm run celo:deploy -- --verify"});

@@ -6,6 +6,7 @@
 - **Nothing has happened on real Celo mainnet.** No contract deployment, wallet funding, ERC-8004 or Self registration, Textile swap, x402 payment, or outside-user payment has taken place.
 - **The wallet buttons have not been clicked with a real browser wallet.** Their contract calls are tested on a fork, but the wallet popups are not.
 - **The Altana passkey flow is untested live,** and Altana relay attribution is unconfirmed.
+- **No Textile partner key yet.** Conversions from a workspace contract need one. Textile's free price preview works without it.
 - **Hackathon eligibility needs an organizer ruling,** because the imported application predates the build period.
 - Unit tests ran on Node 25.2.1. The production image runs Node 22.
 
@@ -20,6 +21,10 @@
 | App-to-contract test on a private Celo fork (`npm run celo:e2e`) | 22 of 22 checks passed |
 | Deployment rehearsal on a private fork | Passed, including a real-USDC-contract creator payment |
 | Mainnet deployment estimate | 7.62M gas, about 1.54 CELO, 2.32 CELO recommended |
+| App contract interfaces against the compiled contracts | All four match |
+| ERC-8004 registration, simulated on mainnet from the agent wallet | Succeeds, about 0.037 CELO |
+| Textile FX live price preview | 5 USD₮ quoted into cNGN, wBRL and wCOP |
+| Attribution tag encodes and decodes | Passed with the issued tag |
 | Production dependency advisories | 0 |
 | Production image on real PostgreSQL | Boots, migrates 62 tables, and serves all checked routes |
 | Live site, `https://celo.growtendril.xyz` | Healthy, with security headers and no browser console errors on the landing or signup pages |

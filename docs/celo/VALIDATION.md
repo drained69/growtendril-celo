@@ -2,7 +2,7 @@
 
 ## Not verified
 
-- **No independent contract audit has run.** Plamen cannot start inside a Claude session, so the contracts have had a manual security review only. Run it from a normal terminal before deploying (see [the runbook](MAINNET_RUNBOOK.md)).
+- **The Plamen audit has not completed.** It needs the command-line Claude logged in to an account that can reach the API. The contracts have had a line-by-line manual review and the invariant fuzzing below. Run Plamen before deploying (see [the runbook](MAINNET_RUNBOOK.md)).
 - **Nothing has happened on real Celo mainnet.** No contract deployment, wallet funding, ERC-8004 or Self registration, Textile swap, x402 payment, or outside-user payment has taken place.
 - **The wallet buttons have not been clicked with a real browser wallet.** Their contract calls are tested on a fork, but the wallet popups are not.
 - **The Altana passkey flow is untested live,** and Altana relay attribution is unconfirmed.
@@ -16,7 +16,8 @@
 |---|---|
 | TypeScript | Clean |
 | App tests | 46 files, 418 tests passed |
-| Contract tests | 36 passed |
+| Contract tests | 44 passed, including 8 invariant tests |
+| Invariant fuzzing, 8 safety rules (local run: 2,000 sequences of 256 random actions) | 512,000 actions per rule, no violation |
 | Contract test against forked Celo USDC | Passed |
 | App-to-contract test on a private Celo fork (`npm run celo:e2e`) | 22 of 22 checks passed |
 | Deployment rehearsal on a private fork | Passed, including a real-USDC-contract creator payment |
@@ -36,6 +37,16 @@ The fork test runs the real server code against the real contracts. It confirms 
 - Rejection frees reserved funds, and the kill switch stops new payments.
 - The owner can remove and restore the agent, and withdraw all unreserved funds.
 - Outcomes and decision receipts are recorded onchain, and a forged record fails verification.
+
+The invariant tests in `contracts/test/Invariants.t.sol` treat the agent's key as stolen and fire random sequences of every action by every party. After each step they check that:
+
+- Reserved funds equal the open payments in each token.
+- No mission or experiment exceeds its budget, and every commitment is counted exactly once.
+- A payment to a person runs only with approval from someone other than the agent, and anything paid without approval went to an approved service.
+- The agent never receives funds.
+- A currency conversion never takes more USD₮ than approved, never delivers below the approved minimum, and leaves no allowance open.
+- The owner can always withdraw everything not reserved, frozen or not.
+- The escrow's balance equals what its campaigns hold, and each reward is paid at most once and for its exact amount.
 
 ## Fixed in this audit
 

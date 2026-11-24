@@ -1,0 +1,87 @@
+{
+  "name": "growtendril-celo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run arc:tools:build && next dev -p 3000",
+    "dev:web": "npm run arc:tools:build && next dev -p 3000",
+    "signals": "node --env-file-if-exists=.env --import tsx services/signals-api/server.ts",
+    "build": "npm run arc:tools:build && next build",
+    "start": "next start -p ${PORT:-3000}",
+    "typecheck": "npm run arc:tools:build && tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "test:events": "tsx scripts/test-events.ts",
+    "worker": "tsx scripts/worker.ts",
+    "doctor": "node --env-file-if-exists=.env --import tsx scripts/celo-doctor.ts",
+    "circle:entity-secret": "tsx scripts/circle-entity-secret.ts",
+    "ledger:exceptions": "tsx scripts/ledger-exceptions.ts",
+    "arc:tools:build": "tsc -p packages/arc-growth-tools/tsconfig.json",
+    "arc:contracts:generate": "node scripts/generate-arc-escrow-artifact.mjs",
+    "arc:escrow:deploy": "npm run arc:tools:build && node --import tsx scripts/arc-escrow-deploy.ts",
+    "arc:demo": "node --import tsx examples/arc-outcome-demo.ts",
+    "arc:verify-receipt": "node --import tsx scripts/verify-arc-receipt.ts",
+    "celo:register": "node --env-file-if-exists=.env --import tsx scripts/celo-register.ts",
+    "celo:deploy": "npm run arc:tools:build && node --env-file-if-exists=.env --import tsx scripts/celo-deploy.ts",
+    "celo:env:push": "node --env-file-if-exists=.env --import tsx scripts/celo-env-push.ts",
+    "celo:e2e": "npm run arc:tools:build && node --import tsx scripts/celo-e2e.ts"
+  },
+  "dependencies": {
+    "@altananetwork/sdk": "^1.1.0",
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@celo/attribution-tags": "^0.5.0",
+    "@electric-sql/pglite": "^0.5.8",
+    "@fontsource-variable/hanken-grotesk": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/shantell-sans": "^5.3.0",
+    "@selfxyz/agent-sdk": "^0.3.1",
+    "@x402/core": "^2.32.0",
+    "@x402/evm": "^2.32.0",
+    "@x402/express": "^2.32.0",
+    "drizzle-orm": "^0.45.3",
+    "express": "^5.2.1",
+    "lucide-react": "^1.51.0",
+    "next": "^15.5.29",
+    "pg": "^8.23.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "server-only": "^0.0.1",
+    "tsx": "^4.23.15",
+    "viem": "^2.57.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@circle-fin/adapter-circle-wallets": "^1.8.1",
+    "@circle-fin/app-kit": "^1.16.0",
+    "@circle-fin/developer-controlled-wallets": "^10.8.1",
+    "@circle-fin/modular-wallets-core": "^1.0.16",
+    "@circle-fin/onramp-kit": "^1.0.3",
+    "@circle-fin/x402-batching": "^3.5.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.4",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "^0.31.11",
+    "postcss": "^8.5.28",
+    "railway": "^3.12.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.28"
+    },
+    "toml": "^4.2.0",
+    "uuid": "^11.1.1",
+    "@circle-fin/modular-wallets-core": {
+      "viem": "$viem"
+    }
+  }
+}

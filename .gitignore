@@ -1,0 +1,87 @@
+# ── Dependencies ──
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+
+# ── Next.js build output (incl. side-by-side dist dirs: NEXT_DIST_DIR=.next-*) ──
+.next/
+.next-*/
+out/
+build/
+.turbo/
+.swc/
+next-env.d.ts
+*.tsbuildinfo
+
+# ── Local data, secrets and environment ──
+.data/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.db
+*.db-*
+*.db-journal
+*.db-shm
+*.db-wal
+
+# ── Test & tooling output ──
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+reports/
+artifacts/
+.cache/
+*.log
+logs/
+*.pid
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+recovery_file_*.dat
+
+# ── Launch / demo video (kept locally, never pushed) ──
+video/
+*.mp4
+*.mov
+*.webm
+*.wav
+
+# ── Editor, OS and local agent config ──
+.DS_Store
+.vscode/
+.idea/
+.claude/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ── Local notes / agent prompts ──
+CODEX_PROMPT.md
+
+# Rebuilt package and contract outputs
+packages/*/dist/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/.scratchpad/
+contracts/artifacts/
+
+# ── Inherited internal notes and earlier hackathon material (kept locally) ──
+docs/dorahacks/
+docs/PLAN.md
+docs/PRODUCT_AUDIT_2026-10-15.md
+docs/PRODUCT_REVIEW_ORIGAMI.md
+docs/RELEASE_AUDIT_2026-10-16.md
+docs/DISCORD_WALKTHROUGH.md

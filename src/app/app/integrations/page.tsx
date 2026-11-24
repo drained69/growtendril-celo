@@ -1,0 +1,250 @@
+import { commerceSummary } from "@/server/domain/growth/commerce";
+import { CommerceForm } from "@/components/features/integrations/commerce-form";
+import { CELO } from "@/server/integrations/celo/config";
+import { fmtUsdc } from "@/lib/money";
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { eq } from "drizzle-orm";
+import { BookOpen, Code2, Globe, Lock, MessagesSquare, Newspaper, PlaySquare, Plug, Webhook } from "lucide-react";
+import { requireProject } from "@/server/auth/current";
+import { can } from "@/server/auth/access";
+import { listConnections, type CredentialSource, type ProviderConnection } from "@/server/integrations/vault";
+import { CONVERSION_EVENTS, EVENT_LABEL } from "@/server/domain/growth/attribution-links";
+import { relTime } from "@/lib/time";
+import { Badge, Callout, Card, CardBody, CardFooter, CardHeader, ExternalLink, KeyValue, PageHeader, Stat, StatStrip, StatusDot, type Tone } from "@/components/ui";
+import { CopyButton, CopyField } from "@/components/ui/copy";
+import { ConnectionForm } from "@/components/features/integrations/connection-form";
+import { WebhookSecret } from "@/components/features/integrations/webhook-secret";
+import { appOrigin } from "@/server/lib/origin";
+import { schema as s } from "@/server/db/client";
+import { sourceAppliesTo, sourceAudienceLabel } from "@/lib/source-readiness";
+import { Notifications } from "@/components/features/integrations/notifications";
+import { WEBHOOK_EVENTS, listEndpoints, recentDeliveries } from "@/server/domain/notifications/webhooks";
+
+const CATEGORY: Record<string, { label: string; icon: ReactNode }> = {
+  social: { label: "Social", icon: <Globe /> },
+  code: { label: "Code", icon: <Code2 /> },
+  community: { label: "Community", icon: <MessagesSquare /> },
+  video: { label: "Video", icon: <PlaySquare /> },
+  news: { label: "News & blogs", icon: <Newspaper /> },
+};
+
+const ACCESS: Record<string, { label: string; tone: Tone }> = {
+  official_api: { label: "Official API", tone: "good" },
+  public_api: { label: "Public API", tone: "info" },
+  restricted: { label: "Restricted", tone: "muted" },
+};
+
+const SOURCE: Record<CredentialSource, { label: string; tone: Tone; help: string }> = {
+  workspace: { label: "Workspace key", tone: "good", help: "Using credentials stored for this workspace." },
+  platform: { label: "Platform default", tone: "info", help: "Using the deployment's shared credentials. Add your own for separate rate limits." },
+  keyless: { label: "Keyless", tone: "info", help: "Public endpoint — no credentials needed." },
+  missing: { label: "Missing", tone: "warn", help: "Not configured. Add its required settings or credentials before it can contribute." },
+  restricted: { label: "Unavailable", tone: "muted", help: "" },
+};
+
+function dotTone(c: ProviderConnection): "good" | "warn" | "bad" | "idle" {
+  if (c.source === "restricted") return "idle";
+  if (c.status === "error") return "bad";
+  return c.ready ? "good" : "warn";
+}
+
+export default async function Integrations() {
+  const { project, role, db } = await requireProject();
+  const [connections, [profile], notificationEndpoints, notificationDeliveries] = await Promise.all([listConnections(db, project.id), db.select({ audience: s.productProfiles.audience }).from(s.productProfiles).where(eq(s.productProfiles.projectId, project.id)), listEndpoints(db, project.id), recentDeliveries(db, project.id)]);
+  const commerce = await commerceSummary(db, project.id);
+  const canManage = can(role, "manage_integrations");
+  const origin = await appOrigin();
+  const endpoint = `${origin}/api/events`;
+
+  const ready = connections.filter((c) => c.ready && sourceAppliesTo(c, profile?.audience)).length;
+  const own = connections.filter((c) => c.source === "workspace").length;
+  const missing = connections.filter((c) => c.source === "missing").length;
+  const errors = connections.filter((c) => c.status === "error").length;
+  const ordered = [...connections].sort((a, b) => Number(a.source === "restricted") - Number(b.source === "restricted"));
+
+  const curl = `BODY='{"event":"signup","visitorId":"test_user_123","idempotencyKey":"test-signup-user_123","dryRun":true}'
+T=$(date +%s)
+SIG=$(printf '%s' "$T.$BODY" | openssl dgst -sha256 -hmac "$GROWTENDRIL_WEBHOOK_SECRET" | sed 's/^.* //')
+
+curl -X POST ${endpoint} \\
+  -H "content-type: application/json" \\
+  -H "x-growtendril-project: ${project.id}" \\
+  -H "x-growtendril-signature: t=$T,v1=$SIG" \\
+  -d "$BODY"`;
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Integrations"
+        description="Market data sources the operator scans, and the signed webhook your product uses to report conversions."
+        meta={<span>Official and public APIs only, within their terms and rate limits. Unavailable sources return nothing — never invented data.</span>}
+      />
+
+      {!canManage && <Callout tone="info" title="Read-only">Owners and admins test connections and manage credentials.</Callout>}
+
+      <StatStrip className="grid-cols-2 sm:grid-cols-4">
+        <Stat label="Sources ready" value={`${ready} / ${connections.length}`} sub="for your customer audience" tone={ready ? "good" : "warn"} />
+        <Stat label="Workspace keys" value={own} sub="stored encrypted" />
+        <Stat label="Need setup" value={missing} tone={missing ? "warn" : undefined} />
+        <Stat label="Failing checks" value={errors} tone={errors ? "bad" : undefined} />
+      </StatStrip>
+
+      <Card>
+        <CardHeader title="Commerce payments" description="Connect captured purchases and refunds to customer value and creator rewards." />
+        <CardBody className="space-y-4">
+          <CommerceForm canManage={canManage} mainnetChainId={CELO.chainId} connection={commerce.connection} />
+          <p className="text-xs text-ink-3">{commerce.connection?.lastEventAt ? `Last verified event: ${relTime(commerce.connection.lastEventAt)}` : "Waiting for verified merchant events."} Testnet orders stay separate from live revenue and rewards.</p>
+          <CopyField value={`${origin}/api/commerce/events`} />
+          <p className="text-xs text-ink-3">Use your workspace signing secret below. Report the order ID, payment hash, customer ID, referral and transaction log pointers. GrowTendril reads the payment facts from the connected contract.</p>
+          {commerce.orders.length > 0 && <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th className="py-2">Order</th><th>Status</th><th>Captured</th><th>Refunded</th><th>Network</th></tr></thead><tbody>{commerce.orders.map(o => <tr key={o.id} className="border-t border-line"><td className="py-2">{o.merchantOrderId}</td><td>{o.status.replace(/_/g," ")}</td><td>{fmtUsdc(o.capturedMicro)}</td><td>{fmtUsdc(o.refundedMicro)}</td><td>{o.dataMode === "TESTNET" ? "Testnet" : "Mainnet"}</td></tr>)}</tbody></table></div>}
+        </CardBody>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        {ordered.map((c) => {
+          const p = c.provider;
+          const cat = CATEGORY[p.category] ?? { label: p.category, icon: <Plug /> };
+          const access = ACCESS[p.access];
+          const src = SOURCE[c.source];
+          const restricted = c.source === "restricted";
+          const applies = sourceAppliesTo(c, profile?.audience);
+          return (
+            <Card key={p.id} className={restricted ? "opacity-75" : undefined}>
+              <CardHeader
+                title={
+                  <span className="flex items-center gap-2">
+                    <StatusDot tone={dotTone(c)} />
+                    {p.name}
+                  </span>
+                }
+                description={p.description}
+                icon={cat.icon}
+              />
+              <CardBody className="space-y-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge tone={src.tone}>{src.label}</Badge>
+                  {!applies && <Badge tone="muted">{sourceAudienceLabel(c)}</Badge>}
+                  <Badge tone="muted">{cat.label}</Badge>
+                  <Badge tone={access.tone}>
+                    {restricted && <Lock className="size-2.5" />}
+                    {access.label}
+                  </Badge>
+                </div>
+                {restricted ? (
+                  <p className="text-[12px] leading-snug text-ink-3">{p.restrictedReason ?? "Not usable within this provider's terms."}</p>
+                ) : (
+                  <>
+                    <KeyValue
+                      items={[
+                        { k: "Credentials", v: c.hint ? <span className="num text-ink-2">{c.hint}</span> : <span className="text-ink-3">{c.source === "keyless" ? "None needed" : c.source === "platform" ? "Platform default" : c.source === "workspace" ? "Saved settings (no secret)" : "Not stored"}</span> },
+                        { k: "Last checked", v: c.lastCheckedAt ? relTime(c.lastCheckedAt) : <span className="text-ink-3">Never</span> },
+                      ]}
+                    />
+                    {c.lastError && <Callout tone="danger">{c.lastError}</Callout>}
+                    {!c.lastError && c.source !== "workspace" && <p className="text-[11.5px] leading-snug text-ink-3">{src.help}</p>}
+                    <ConnectionForm
+                      providerId={p.id}
+                      providerName={p.name}
+                      fields={p.credentialFields.map((f) => ({ key: f.key, label: f.label, secret: f.secret, placeholder: f.placeholder, optional: f.optional, help: f.help }))}
+                      config={c.config}
+                      connected={c.source === "workspace"}
+                      testable={c.ready}
+                      canManage={canManage}
+                    />
+                  </>
+                )}
+              </CardBody>
+              <CardFooter>
+                <span className="num text-ink-4">{p.id}</span>
+                <ExternalLink href={p.docsUrl} className="text-[11.5px]">
+                  Docs
+                </ExternalLink>
+              </CardFooter>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card id="notifications">
+        <CardHeader title="Outbound notifications" description="Send approval, payment, operator cycle and creator post updates to Slack, Discord or a signed JSON endpoint." icon={<Webhook />} />
+        <CardBody><Notifications endpoints={notificationEndpoints} deliveries={notificationDeliveries.map((delivery) => ({ ...delivery, createdAt: delivery.createdAt.toISOString() }))} events={[...WEBHOOK_EVENTS]} canManage={canManage} /></CardBody>
+      </Card>
+
+      <Card id="events">
+        <CardHeader
+          title="Inbound events"
+          description="Report conversions (signups, purchases, leads, bookings…) with the visitor's gos_ref so they are attributed to the experiment that produced them."
+          icon={<Webhook />}
+        />
+        <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:divide-x lg:divide-line">
+          <CardBody className="space-y-4">
+            <div>
+              <div className="label mb-1.5">Endpoint</div>
+              <CopyField value={endpoint} />
+              <p className="mt-1.5 text-[11.5px] text-ink-3">
+                <span className="num">POST</span> · JSON body · max 20 KB · 120 req/min per IP
+              </p>
+            </div>
+            <div>
+              <div className="label mb-1.5">Project ID</div>
+              <CopyField value={project.id} />
+              <p className="mt-1.5 text-[11.5px] text-ink-3">
+                Sent as <code className="num text-ink-2">x-growtendril-project</code>.
+              </p>
+            </div>
+            <div>
+              <div className="label mb-1.5">Signing secret</div>
+              <WebhookSecret canManage={canManage} />
+            </div>
+          </CardBody>
+          <CardBody className="space-y-4 border-t border-line lg:border-t-0">
+            <div>
+              <div className="label mb-1.5">Headers</div>
+              <KeyValue
+                items={[
+                  { k: <code className="num">x-growtendril-project</code>, v: <span className="text-ink-2">your project ID</span> },
+                  { k: <code className="num">x-growtendril-signature</code>, v: <code className="num text-ink-2">t=&lt;unix&gt;,v1=&lt;hex&gt;</code> },
+                ]}
+              />
+              <p className="mt-2 text-[11.5px] leading-snug text-ink-3">
+                <code className="num">v1 = hex(HMAC_SHA256(secret, &quot;&lt;t&gt;.&lt;raw body&gt;&quot;))</code>. Timestamps older than 5 minutes are rejected; <code className="num">idempotencyKey</code> (8–200 chars) makes retries safe.
+              </p>
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="label">Example</span>
+                <CopyButton value={curl} label="Copy" />
+              </div>
+              <pre className="num overflow-x-auto rounded-[8px] border border-line bg-bg p-3 text-[11.5px] leading-relaxed text-ink-2">{curl}</pre>
+            </div>
+            <div>
+              <div className="label mb-1.5">Event types</div>
+              <div className="flex flex-wrap gap-1">
+                {CONVERSION_EVENTS.map((e) => (
+                  <span key={e} title={EVENT_LABEL[e]}>
+                    <Badge tone="muted" className="num">
+                      {e}
+                    </Badge>
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-[11.5px] leading-snug text-ink-3">
+                The example uses <code className="num">dryRun: true</code>: it checks the signature and payload without recording a conversion. For a real customer event, remove <code className="num">dryRun</code>, include the campaign&apos;s <code className="num">ref</code>, and use a unique idempotency key. Optional fields: <code className="num">customName</code>, <code className="num">visitorId</code>, <code className="num">occurredAt</code> (ISO 8601), <code className="num">value</code> (USDC), <code className="num">metadata</code>.
+              </p>
+              <p className="mt-2 text-[11.5px] leading-snug text-ink-3">
+                For <Link href="/app/customer-value" className="text-s1 hover:underline">Customer value</Link>: send your own stable customer or account ID as <code className="num">visitorId</code> on every event about that customer. Send <code className="num">ref</code> at least once (e.g. on signup); later <code className="num">purchase</code> events with the same <code className="num">visitorId</code> are linked even without it. Send a <code className="num">refund</code> event with the same customer ID, positive refunded value and original <code className="num">metadata.orderId</code> when money is returned. Include <code className="num">value</code> on purchases and <code className="num">metadata.orderId</code> so a resent order isn&apos;t counted twice. Use an opaque ID rather than an email where you can.
+              </p>
+            </div>
+          </CardBody>
+        </div>
+        <CardFooter>
+          <span className="flex items-center gap-1.5">
+            <BookOpen className="size-3.5" />
+            Visits are recorded automatically by tracked links <code className="num text-ink-2">/r/&lt;referral code&gt;</code>, which redirect to the UTM-tagged destination.
+          </span>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}

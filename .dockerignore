@@ -1,0 +1,13 @@
+.git
+node_modules
+.next*
+.data
+.env
+.env.*
+!.env.example
+video
+coverage
+*.tsbuildinfo
+.DS_Store
+.railway
+.claude

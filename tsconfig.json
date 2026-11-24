@@ -1,0 +1,53 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@arc-growth/*": [
+        "./packages/arc-growth-tools/dist/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".next-audit/types/**/*.ts",
+    ".next-build/types/**/*.ts",
+    ".next-buildcheck/types/**/*.ts",
+    ".next-ledger/types/**/*.ts",
+    ".next-product-audit/types/**/*.ts",
+    ".next-ui/types/**/*.ts",
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-smoke/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".data",
+    "video",
+    "packages/arc-growth-tools/dist"
+  ]
+}

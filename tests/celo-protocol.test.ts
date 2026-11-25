@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { concat, keccak256, toHex, type Hex } from "viem";
 import { merkleProof, merkleRoot } from "@/lib/merkle";
-import { aggregateOutcomes, intentIdFor, onchainPolicy, protocolId, workspaceRef } from "@/server/integrations/celo/protocol";
+import { aggregateOutcomes, intentIdFor, onchainPolicy, protocolId, vaultTermsProblem, workspaceRef } from "@/server/integrations/celo/protocol";
+import { PAYOUT_TOKENS } from "@/server/integrations/celo/corridors";
 
 const leaf = (value: string) => keccak256(toHex(value));
 /** The same check GrowthLedger.verifyRecord performs. */
@@ -47,5 +48,30 @@ describe("protocol identifiers and policy", () => {
   });
   it("maps policy categories to the contract's bitmask", () => {
     expect(onchainPolicy({autonomyEnabled: true, maxTransactionMicro: 1, dailySpendMicro: 2, hardCeilingMicro: 3, autonomousCategories: ["research"], approvalCategories: ["kol", "treasury"]})).toEqual({autonomyEnabled: true, maxTransaction: 1n, dailySpend: 2n, hardCeiling: 3n, autonomousCategories: 1, approvalCategories: 68});
+  });
+});
+
+describe("terms checked before the owner signs", () => {
+  const creator = "0x00000000000000000000000000000000000c4fe5" as const;
+  const none = "0x0000000000000000000000000000000000000000" as const;
+  const naira = PAYOUT_TOKENS.cNGN.address;
+  const usdc = {recipient: creator, amount: 5_000_000n, payoutToken: none, minPayout: 0n};
+  const corridor = {recipient: creator, amount: 5_000_000n, payoutToken: naira, minPayout: 7_000_000_000n};
+  const fair = 7_200_000_000n;
+
+  it("accepts a USDC payment that matches the approval", () => {
+    expect(vaultTermsProblem(usdc, {recipient: creator, amountMicro: 5_000_000, payoutToken: null, fairBuyAmount: null})).toBeNull();
+  });
+  it("refuses a different recipient, amount or currency", () => {
+    expect(vaultTermsProblem({...usdc, recipient: "0x0000000000000000000000000000000000000bad"}, {recipient: creator, amountMicro: 5_000_000, payoutToken: null, fairBuyAmount: null})).toMatch(/does not match/);
+    expect(vaultTermsProblem({...usdc, amount: 6_000_000n}, {recipient: creator, amountMicro: 5_000_000, payoutToken: null, fairBuyAmount: null})).toMatch(/does not match/);
+    expect(vaultTermsProblem(corridor, {recipient: creator, amountMicro: 5_000_000, payoutToken: null, fairBuyAmount: null})).toMatch(/currency/);
+  });
+  it("accepts a conversion minimum close to today's rate", () => {
+    expect(vaultTermsProblem(corridor, {recipient: creator, amountMicro: 5_000_000, payoutToken: "cNGN", fairBuyAmount: fair})).toBeNull();
+  });
+  it("refuses a near-zero conversion minimum, or one it cannot price", () => {
+    expect(vaultTermsProblem({...corridor, minPayout: 1n}, {recipient: creator, amountMicro: 5_000_000, payoutToken: "cNGN", fairBuyAmount: fair})).toMatch(/far below today's rate/);
+    expect(vaultTermsProblem(corridor, {recipient: creator, amountMicro: 5_000_000, payoutToken: "cNGN", fairBuyAmount: null})).toMatch(/cannot be checked/);
   });
 });

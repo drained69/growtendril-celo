@@ -14,6 +14,9 @@ contract OutcomeRewardsEscrow {
     uint256 public constant REVIEW_WINDOW = 7 days;
     /// @notice An arbiter that stays silent this long cannot keep a queued reward locked.
     uint256 public constant DISPUTE_TIMEOUT = 14 days;
+    uint256 public constant MAX_CAMPAIGN_LENGTH = 365 days;
+    /// @notice A recipient always has at least this long to dispute a cut to their reward.
+    uint256 public constant MIN_DISPUTE_TIME = 1 days;
     bool private entered;
 
     struct Campaign {
@@ -75,6 +78,7 @@ contract OutcomeRewardsEscrow {
     function createCampaign(bytes32 salt, address arbiter, uint256 deadline, uint256 budget, uint256 base, uint256 qualityBonus, uint256 outcomeBonus, uint256 outcomeCap, uint256 slots, bytes32 termsHash) external nonReentrant {
         Campaign storage c = campaigns[campaignKey(msg.sender, salt)];
         require(salt != bytes32(0) && c.owner == address(0), "campaign exists");
+        require(deadline <= block.timestamp + MAX_CAMPAIGN_LENGTH, "invalid terms");
         require(arbiter != address(0) && arbiter != msg.sender && deadline > block.timestamp && slots > 0 && slots <= 1000 && base > 0 && termsHash != bytes32(0), "invalid terms");
         require(outcomeCap <= 100 && budget >= (base + qualityBonus + outcomeBonus * outcomeCap) * slots, "insufficient reward pool");
         c.owner = msg.sender; c.arbiter = arbiter; c.deadline = deadline; c.available = budget;
@@ -102,9 +106,10 @@ contract OutcomeRewardsEscrow {
         emit RewardQueued(campaignId,rewardId,recipient,amount,evidenceHash);
     }
     /// @notice Merchant refunds can reduce pending outcome bonuses; accepted base/quality remain protected.
+    /// @dev Never after a dispute, so an arbiter's ruling stands, and never so late that the recipient cannot dispute.
     function reduceOutcomes(bytes32 campaignId, bytes32 rewardId, uint256 outcomes, bytes32 evidenceHash) external nonReentrant {
         Campaign storage c = campaigns[campaignId]; Reward storage r = rewards[campaignId][rewardId];
-        require(msg.sender == c.owner && r.recipient != address(0) && !r.closed && !r.disputed && block.timestamp < r.claimableAt, "cannot adjust");
+        require(msg.sender == c.owner && r.recipient != address(0) && !r.closed && disputedAt[campaignId][rewardId] == 0 && block.timestamp + MIN_DISPUTE_TIME <= r.claimableAt, "cannot adjust");
         require(outcomes <= r.outcomes && evidenceHash != bytes32(0), "only decrease outcomes");
         uint256 amount = amountFor(c,r.quality,outcomes);
         c.reserved -= r.amount - amount; c.available += r.amount - amount;
@@ -120,7 +125,8 @@ contract OutcomeRewardsEscrow {
         Campaign storage c = campaigns[campaignId]; Reward storage r = rewards[campaignId][rewardId];
         require(msg.sender == c.arbiter && r.disputed && !r.closed, "arbiter only");
         r.disputed = false;
-        if (!release) { r.closed = true; c.reserved -= r.amount; c.available += r.amount; }
+        // A denied reward frees its slot; the denied recipient still cannot be queued again.
+        if (!release) { r.closed = true; c.reserved -= r.amount; c.available += r.amount; c.queued--; }
         emit DisputeResolved(campaignId,rewardId,release);
     }
     /// @notice Anyone may relay a claim; funds always reach the bound recipient.

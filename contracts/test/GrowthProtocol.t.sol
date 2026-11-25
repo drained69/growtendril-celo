@@ -186,6 +186,16 @@ contract GrowthProtocolTest {
         vm.prank(AGENT); vm.expectRevert("below minimum payout"); ws.executeCorridor(id, abi.encodeCall(MockReactor.fill, (usdt, cngn, 10e6, 13_999e6)));
         require(usdt.balanceOf(address(ws)) == 100e6 && stateOf(id) == GrowthWorkspace.State.Approved, "partial execution");
     }
+    /// A conversion labelled as a service, with a near-zero minimum, must still wait for a person.
+    function testConversionAlwaysNeedsAHuman() public {
+        vm.prank(OWNER); ws.setPolicy(policy(true));
+        vm.prank(OWNER); ws.setService(SELLER, true);
+        GrowthWorkspace.IntentRequest memory r = GrowthWorkspace.IntentRequest(keccak256("disguised"), MISSION, EXPERIMENT, SELLER, address(usdt), address(cngn), 2e6, uint64(block.timestamp + 1 days), 0, GrowthWorkspace.Kind.Service, 1, keccak256("evidence"));
+        vm.prank(AGENT); ws.propose(r);
+        require(stateOf(r.id) == GrowthWorkspace.State.Pending, "conversion skipped approval");
+        vm.prank(AGENT); vm.expectRevert("not executable"); ws.executeCorridor(r.id, abi.encodeCall(MockReactor.fill, (usdt, cngn, 2e6, 1)));
+        require(usdt.balanceOf(address(ws)) == 100e6, "USDT left without approval");
+    }
     function testCorridorCannotSpendAboveTheApprovedAmount() public {
         bytes32 id = corridor(14_000e6);
         vm.prank(AGENT); vm.expectRevert("swap failed"); ws.executeCorridor(id, abi.encodeCall(MockReactor.fill, (usdt, cngn, 11e6, 15_000e6)));

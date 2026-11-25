@@ -96,4 +96,33 @@ contract OutcomeRewardsEscrowTest {
         require(owner==address(this)&&terms==keccak256("terms"),"campaign was taken");
         vm.expectRevert("campaign exists");escrow.createCampaign(salt,ARBITER,deadline,100e6,4e6,3e6,1e6,3,10,keccak256("terms"));
     }
+    function testArbiterReleaseCannotBeUndoneByCuttingTheReward() public {
+        queue();vm.prank(CREATOR);escrow.dispute(CAMPAIGN,REWARD);vm.prank(ARBITER);escrow.resolve(CAMPAIGN,REWARD,true);
+        vm.expectRevert("cannot adjust");escrow.reduceOutcomes(CAMPAIGN,REWARD,0,keccak256("after ruling"));
+        vm.warp(deadline+3 days);escrow.claim(CAMPAIGN,REWARD);
+        require(token.balanceOf(CREATOR)==9_400_000,"ruling undone");
+    }
+    function testRecipientAlwaysHasADayToDisputeACut() public {
+        queue();
+        vm.warp(deadline+2 days);escrow.reduceOutcomes(CAMPAIGN,REWARD,2,keccak256("refund"));
+        vm.warp(deadline+2 days+1);vm.expectRevert("cannot adjust");escrow.reduceOutcomes(CAMPAIGN,REWARD,1,keccak256("last minute"));
+        vm.prank(CREATOR);escrow.dispute(CAMPAIGN,REWARD);
+    }
+    function testDeniedRewardFreesItsSlot() public {
+        bytes32 salt=keccak256("one slot");
+        token.mint(address(this),8e6);token.approve(address(escrow),8e6);
+        escrow.createCampaign(salt,ARBITER,deadline,8e6,4e6,3e6,1e6,0,1,keccak256("terms"));
+        bytes32 c=escrow.campaignKey(address(this),salt);
+        vm.warp(deadline);escrow.queueReward(c,REWARD,CREATOR,100,0,keccak256("e"));
+        vm.expectRevert("slots or evidence");escrow.queueReward(c,keccak256("second"),address(0x2222),100,0,keccak256("e"));
+        escrow.dispute(c,REWARD);vm.prank(ARBITER);escrow.resolve(c,REWARD,false);
+        escrow.queueReward(c,keccak256("second"),address(0x2222),100,0,keccak256("e"));
+        vm.expectRevert("duplicate or invalid recipient");escrow.queueReward(c,keccak256("third"),CREATOR,100,0,keccak256("e"));
+    }
+    function testCampaignDeadlineIsBounded() public {
+        token.mint(address(this),300e6);token.approve(address(escrow),300e6);
+        vm.expectRevert("invalid terms");escrow.createCampaign(keccak256("forever"),ARBITER,type(uint256).max,100e6,4e6,3e6,1e6,3,10,keccak256("terms"));
+        vm.expectRevert("invalid terms");escrow.createCampaign(keccak256("too long"),ARBITER,block.timestamp+366 days,100e6,4e6,3e6,1e6,3,10,keccak256("terms"));
+        escrow.createCampaign(keccak256("a year"),ARBITER,block.timestamp+365 days,100e6,4e6,3e6,1e6,3,10,keccak256("terms"));
+    }
 }

@@ -14,15 +14,7 @@ npm run celo:env:push
 
 **Ask the organizers about eligibility.** The rules say code is written during the hackathon, from November 20, and GrowTendril existed before that. Tell them what was imported and what was built for Celo, and get their answer in writing. `docs/celo/import-manifest.json` lists the imported files.
 
-**Run the independent contract audit.** It cannot start inside a Claude session, so open the macOS Terminal app, go to the project folder, and run:
-
-```bash
-python3 ~/.claude/scripts/plamen_driver.py "$PWD/contracts/.scratchpad/config.json"
-```
-
-Run the same command again to resume if it stops. Don't add `--fresh`: it empties the scratch folder, including this settings file. The command-line `claude` must be logged in and able to reach the API. Test it first with `claude -p "Reply OK"`.
-
-Fix every Critical, High and valid Medium finding, then rerun step 3. The contracts cannot be upgraded after deployment, so this is the last cheap moment to change them.
+**Contract review.** The contracts have had a manual review, invariant fuzzing and a partial automated audit, with every candidate finding checked and the valid ones fixed. [Validation](VALIDATION.md) has the details. The contracts cannot be upgraded after deployment, so any further change must happen before step 5, followed by a rerun of step 3.
 
 ## 2. Publish the repo and get your tag
 
@@ -83,7 +75,7 @@ Check the current cost first:
 npm run celo:deploy
 ```
 
-It must say `"ready": true`. The last estimate was 7.62M gas, about 1.54 CELO, with 2.32 CELO recommended. Then deploy:
+It must say `"ready": true`. The last estimate was 7.67M gas, about 1.55 CELO, with 2.33 CELO recommended. Then deploy:
 
 ```bash
 npm run celo:deploy -- --broadcast --confirm-mainnet

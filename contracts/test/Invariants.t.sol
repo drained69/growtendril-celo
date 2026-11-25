@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {GrowthFactory} from "../src/protocol/GrowthFactory.sol";
 import {GrowthWorkspace} from "../src/protocol/GrowthWorkspace.sol";
+import {GrowthLedger} from "../src/protocol/GrowthLedger.sol";
 import {OutcomeRewardsEscrow} from "../src/OutcomeRewardsEscrow.sol";
 
 interface InvVm { function warp(uint256) external; function prank(address) external; }
@@ -74,24 +75,27 @@ contract WorkspaceHandler is Bounded {
         if (experiments.length == 0) return;
         bytes32 experiment = experiments[seed % experiments.length];
         (bytes32 mission,,,,) = ws.experiments(experiment);
-        mode %= 4; // 0 USDC payment, 1 corridor payment, 2 USDC service, 3 USD₮ service outside any experiment
+        // 0 USDC payment, 1 corridor payment, 2 USDC service, 3 USD₮ service outside any experiment,
+        // 4 corridor dressed up as a service with a near-zero minimum (what a stolen agent key would try)
+        mode %= 5;
+        bool corridor = mode == 1 || mode == 4;
         uint64 value = uint64(bound(amount, 1, 25e6));
         GrowthWorkspace.IntentRequest memory r = GrowthWorkspace.IntentRequest({
             id: keccak256(abi.encode("intent", ++n)),
             missionId: mode == 3 ? missions[seed % 2] : mission,
             experimentId: mode == 3 ? bytes32(0) : experiment,
             recipient: mode >= 2 ? SERVICE : creators[seed % 3],
-            token: mode == 1 || mode == 3 ? address(usdt) : address(usdc),
-            payoutToken: mode == 1 ? address(cngn) : address(0),
+            token: corridor || mode == 3 ? address(usdt) : address(usdc),
+            payoutToken: corridor ? address(cngn) : address(0),
             amount: value,
             expiresAt: uint64(block.timestamp + bound(life, 1 hours, 30 days)),
             category: uint8(category % 7),
             kind: mode >= 2 ? GrowthWorkspace.Kind.Service : GrowthWorkspace.Kind.Payment,
-            minPayout: mode == 1 ? uint256(value) * 1000 : 0,
+            minPayout: mode == 1 ? uint256(value) * 1000 : mode == 4 ? 1 : 0,
             evidenceHash: keccak256("evidence")
         });
         vm.prank(AGENT);
-        try ws.propose(r) { intents.push(r.id); if (mode == 1) corridorIntents.push(r.id); hits[mode == 1 ? "proposeCorridor" : r.kind == GrowthWorkspace.Kind.Service ? "proposeService" : "proposePayment"]++; } catch {}
+        try ws.propose(r) { intents.push(r.id); if (corridor) corridorIntents.push(r.id); hits[corridor ? "proposeCorridor" : r.kind == GrowthWorkspace.Kind.Service ? "proposeService" : "proposePayment"]++; } catch {}
     }
     function approve(uint256 seed, uint8 who) external {
         if (intents.length == 0) return;
@@ -283,7 +287,7 @@ contract GrowthWorkspaceInvariants is Bounded {
             if (i.state != GrowthWorkspace.State.Executed) continue;
             if (i.kind == GrowthWorkspace.Kind.Payment) require(i.humanRequired, "payment skipped approval");
             if (i.humanRequired) require(i.approver != address(0) && i.approver != i.proposer, "unapproved execution");
-            else require(i.recipient == handler.SERVICE(), "autonomous payment to unapproved recipient");
+            else require(i.recipient == handler.SERVICE() && i.payoutToken == address(0), "autonomous payment to unapproved recipient or conversion");
         }
     }
 
@@ -426,5 +430,99 @@ contract OutcomeRewardsEscrowInvariants is Bounded {
 
     function invariant_eachRewardPaidOnceAndExactly() public view {
         require(!handler.doublePaid(), "reward paid twice or wrong amount");
+    }
+}
+
+/// Random ledger writes by the owner, the agent, a stranger, and an agent the owner has removed.
+contract LedgerHandler is Bounded {
+    address public constant OWNER = address(0xA11CE);
+    address public constant AGENT = address(0xA6E7);
+    address public constant STRANGER = address(0xBAD);
+    GrowthWorkspace public immutable ws;
+    GrowthLedger public immutable ledger;
+    bytes32 public expectedHead;
+    uint64 public expectedCount;
+    bool public agentActive = true;
+    bool public unauthorizedWrite;
+    bool public totalsFell;
+
+    constructor(GrowthWorkspace ws_, GrowthLedger ledger_) { ws = ws_; ledger = ledger_; }
+
+    function _writer(uint8 who) private view returns (address w, bool allowed) {
+        who %= 3;
+        w = who == 0 ? OWNER : who == 1 ? AGENT : STRANGER;
+        allowed = who == 0 || (who == 1 && agentActive);
+    }
+    function commit(uint8 who, bytes32 root, uint32 records, bool stale) external {
+        (address w, bool allowed) = _writer(who);
+        bytes32 head = stale ? keccak256(abi.encode(root)) : expectedHead;
+        vm.prank(w);
+        try ledger.commitCheckpoint(address(ws), root, records, head) returns (uint64 number) {
+            if (!allowed) unauthorizedWrite = true;
+            expectedCount++;
+            expectedHead = keccak256(abi.encode(expectedHead, address(ws), number, root, records));
+        } catch {}
+    }
+    function record(uint8 who, uint8 experiment, uint256 seed) external {
+        (address w, bool allowed) = _writer(who);
+        bytes32 id = keccak256(abi.encode("experiment", experiment % 3));
+        uint64 customers = uint64(seed % 1000);
+        uint64 revenue = uint64((seed >> 48) % 1e9);
+        GrowthLedger.Totals memory t = GrowthLedger.Totals(customers, customers * uint64((seed >> 16) % 101) / 100, customers * uint64((seed >> 32) % 101) / 100, revenue, revenue * uint64((seed >> 96) % 101) / 100);
+        bool fell = _below(id, t);
+        vm.prank(w);
+        try ledger.recordOutcomes(address(ws), id, t, keccak256("evidence")) {
+            if (!allowed) unauthorizedWrite = true;
+            if (fell) totalsFell = true;
+        } catch {}
+    }
+    function _below(bytes32 id, GrowthLedger.Totals memory t) private view returns (bool) {
+        (uint64 c, uint64 a, uint64 p, uint64 r, uint64 f,,) = ledger.outcomes(address(ws), id);
+        return t.customers < c || t.activated < a || t.paying < p || t.revenue < r || t.refunded < f;
+    }
+    function setAgent(bool active) external {
+        vm.prank(OWNER);
+        ws.setRole(AGENT, active ? 4 : 0);
+        agentActive = active;
+    }
+}
+
+contract GrowthLedgerInvariants is Bounded {
+    LedgerHandler handler;
+    GrowthLedger ledger;
+    GrowthWorkspace ws;
+
+    function setUp() public {
+        vm.warp(1_800_000_000);
+        InvToken usdc = new InvToken();
+        InvToken usdt = new InvToken();
+        InvReactor reactor = new InvReactor();
+        GrowthFactory factory = new GrowthFactory(address(usdc), address(usdt), address(reactor), new address[](0));
+        ledger = new GrowthLedger(address(factory));
+        vm.prank(address(0xA11CE));
+        ws = GrowthWorkspace(factory.createWorkspace(keccak256("ref"), address(0xA6E7), GrowthWorkspace.Policy(false, 0, 0, 1, 0, 127)));
+        handler = new LedgerHandler(ws, ledger);
+    }
+
+    function targetContracts() public view returns (address[] memory targets) {
+        targets = new address[](1);
+        targets[0] = address(handler);
+    }
+    function targetSelectors() public view returns (FuzzSelector[] memory) {
+        LedgerHandler h = handler;
+        bytes4[] memory s = new bytes4[](3);
+        s[0] = h.commit.selector; s[1] = h.record.selector; s[2] = h.setAgent.selector;
+        return _only(address(h), s);
+    }
+
+    /// Every checkpoint extends the hash chain; none can be skipped, forked or rewritten.
+    function invariant_hashChainIsIntact() public view {
+        require(ledger.head(address(ws)) == handler.expectedHead() && ledger.checkpointCount(address(ws)) == handler.expectedCount(), "ledger chain forked or rewritten");
+    }
+    function invariant_onlyCurrentWritersWrite() public view {
+        require(!handler.unauthorizedWrite(), "stranger or removed agent wrote to the ledger");
+    }
+    function invariant_outcomeTotalsNeverFall() public view {
+        require(!handler.totalsFell(), "outcome totals fell");
     }
 }

@@ -12,7 +12,7 @@ import { ChainOutcomeUnknownError } from "./altana";
 import type { ChainTxResult } from "./appkit";
 import { operatorAccount, operatorProblem, operatorWalletClient, publicClient } from "./client";
 import { CELO, txExplorerUrl } from "./config";
-import { isPayoutToken, PAYOUT_TOKENS, USDT } from "./corridors";
+import { formatPayout, isPayoutToken, PAYOUT_TOKENS, USDT, type PayoutToken } from "./corridors";
 import { previewCorridor } from "./textile";
 
 export const CATEGORIES = ["research", "services", "kol", "bounty", "content", "community", "treasury"] as const;
@@ -21,6 +21,8 @@ const ROLE_OPERATOR = 4;
 const INTENT_LIFETIME_SECONDS = 72n * 3600n;
 /** The lowest local amount an approval accepts, relative to the live price when it was proposed. */
 const MIN_PAYOUT_BPS = 9_700n;
+/** Below this share of today's price, a conversion's onchain minimum is refused before the owner signs. */
+const FAIR_FLOOR_BPS = 8_500n;
 const MAX_RECORDS = 1_000;
 const workspaceAbi = GROWTH_WORKSPACE_ABI as Abi;
 const ledgerAbi = GROWTH_LEDGER_ABI as Abi;
@@ -136,6 +138,31 @@ export async function ensureVaultIntent(db: DB, tx: Tx, amountMicro: number): Pr
 }
 
 /** The founder's approval must exist onchain before the app records it as approved. */
+export interface VaultIntentTerms {recipient: Address; amount: bigint; payoutToken: Address; minPayout: bigint}
+
+/**
+ * Why the owner must not sign this intent, or null. The intent may have been written by a stolen
+ * operator key, so its terms are checked against this payment and against today's rate.
+ */
+export function vaultTermsProblem(intent: VaultIntentTerms, expected: {recipient: string | null; amountMicro: number; payoutToken: PayoutToken | null; fairBuyAmount: bigint | null}): string | null {
+  if (intent.recipient.toLowerCase() !== expected.recipient?.toLowerCase() || intent.amount !== BigInt(expected.amountMicro)) return "The payment recorded on Celo does not match this approval. Reject it.";
+  const payoutAddress = expected.payoutToken ? PAYOUT_TOKENS[expected.payoutToken].address : zeroAddress;
+  if (intent.payoutToken.toLowerCase() !== payoutAddress.toLowerCase()) return "The payout currency recorded on Celo does not match this approval. Reject it.";
+  if (!expected.payoutToken) return null;
+  if (expected.fairBuyAmount === null) return "Textile FX is not pricing this currency right now, so the minimum payout cannot be checked. Try again later.";
+  const floor = expected.fairBuyAmount * FAIR_FLOOR_BPS / 10_000n;
+  if (intent.minPayout < floor) return `The minimum payout recorded on Celo (${formatPayout(expected.payoutToken, intent.minPayout)}) is far below today's rate (${formatPayout(expected.payoutToken, expected.fairBuyAmount)}). Reject this payment.`;
+  return null;
+}
+
+export async function checkVaultIntentTerms(db: DB, tx: Tx, amountMicro: number): Promise<string | null> {
+  const workspace = await walletOf(db, tx);
+  const intent = await readWorkspace<VaultIntentTerms>(workspace, "intentOf", [intentIdFor(tx.id, amountMicro)]);
+  const payoutToken = tx.payoutToken && isPayoutToken(tx.payoutToken) ? tx.payoutToken : null;
+  const fairBuyAmount = payoutToken ? await previewCorridor(payoutToken, BigInt(amountMicro)).then((p) => p.buyAmount ? BigInt(p.buyAmount) : null).catch(() => null) : null;
+  return vaultTermsProblem(intent, {recipient: tx.recipient, amountMicro, payoutToken, fairBuyAmount});
+}
+
 export async function assertVaultApproved(db: DB, tx: Tx, amountMicro: number) {
   const workspace = await walletOf(db, tx);
   const intent = await readIntent(workspace, intentIdFor(tx.id, amountMicro));

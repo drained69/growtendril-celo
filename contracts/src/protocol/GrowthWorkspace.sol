@@ -255,7 +255,8 @@ contract GrowthWorkspace {
     }
     function _needsHuman(IntentRequest calldata r) private view returns (bool) {
         Policy memory p = policy;
-        if (!p.autonomyEnabled || r.kind == Kind.Payment || p.approvalCategories & (1 << r.category) != 0) return true;
+        // A conversion's value goes to the swap counterparty, so only a person can vouch for its minimum payout.
+        if (!p.autonomyEnabled || r.kind == Kind.Payment || r.payoutToken != address(0) || p.approvalCategories & (1 << r.category) != 0) return true;
         if (r.amount > p.maxTransaction || _todaySpent() + r.amount > p.dailySpend) return true;
         if (categoryCommitted[r.missionId][r.category] > categoryBudget[r.missionId][r.category]) return true;
         return !approvedServices[r.recipient];

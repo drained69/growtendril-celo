@@ -6,7 +6,7 @@ import type { Hex } from "viem";
 import { schema as s } from "@/server/db/client";
 import { toMicro } from "@/lib/money";
 import { fail, guard, limited, type ActionResult } from "@/server/actions/_common";
-import { ensureVaultIntent, INTENT_STATE, linkWorkspace, openVaultIntents, syncWorkspaceToChain } from "@/server/integrations/celo/protocol";
+import { checkVaultIntentTerms, ensureVaultIntent, INTENT_STATE, linkWorkspace, openVaultIntents, syncWorkspaceToChain } from "@/server/integrations/celo/protocol";
 import { getWallet } from "@/server/integrations/celo/wallets";
 
 export async function linkWorkspaceAction(address: string): Promise<ActionResult> {
@@ -64,6 +64,8 @@ export async function prepareVaultApprovalAction(approvalId: string, amount?: st
     if (amountMicro <= 0 || amountMicro > approval.requestedMicro) return { ok: false, error: "The approved amount cannot exceed the request" };
     const intent = await ensureVaultIntent(db, tx, amountMicro);
     if (intent.state !== INTENT_STATE.Pending && intent.state !== INTENT_STATE.Approved) return { ok: false, error: "This payment is closed in the workspace contract" };
+    const problem = await checkVaultIntentTerms(db, tx, amountMicro);
+    if (problem) return { ok: false, error: problem };
     return { ok: true, data: { workspace: intent.workspace, intentId: intent.intentId, needsSignature: intent.state === INTENT_STATE.Pending } };
   } catch (e) {
     return fail(e);

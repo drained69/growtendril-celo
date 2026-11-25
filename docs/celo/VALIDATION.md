@@ -3,7 +3,7 @@
 ## Not verified
 
 - **No independent human audit.** An automated Plamen audit ran its first 10 of 47 stages and was then stopped to save usage. It produced 97 unverified candidate findings, and each one was checked by hand against the code ([see below](#automated-audit-candidates)). The contracts have also had a line-by-line manual review and the invariant fuzzing below.
-- **Nothing has happened on real Celo mainnet.** No contract deployment, wallet funding, ERC-8004 or Self registration, Textile swap, x402 payment, or outside-user payment has taken place.
+- **Only the contracts are live on mainnet so far.** No ERC-8004 or Self registration, workspace contract, Textile swap, x402 payment, or outside-user payment has taken place yet.
 - **The wallet buttons have not been clicked with a real browser wallet.** Their contract calls are tested on a fork, but the wallet popups are not.
 - **The Altana passkey flow is untested live,** and Altana relay attribution is unconfirmed.
 - **No Textile partner key yet.** Conversions from a workspace contract need one. Textile's free price preview works without it.
@@ -21,7 +21,9 @@
 | Contract test against forked Celo USDC | Passed |
 | App-to-contract test on a private Celo fork (`npm run celo:e2e`) | 22 of 22 checks passed |
 | Deployment rehearsal on a private fork | Passed, including a real-USDC-contract creator payment |
-| Mainnet deployment estimate | 7.67M gas, about 1.55 CELO, 2.33 CELO recommended |
+| Mainnet deployment, November 25, 2026 at 21:04 UTC | Factory, ledger and escrow deployed; settings re-read from chain and correct |
+| Deployed source | All four contracts verified on Sourcify; source fingerprint matches commit `09aed80` |
+| Deployment transactions | All three carry the Loops attribution tag |
 | App contract interfaces against the compiled contracts | All four match |
 | ERC-8004 registration, simulated on mainnet from the agent wallet | Succeeds, about 0.037 CELO |
 | Textile FX live price preview | 5 USD₮ quoted into cNGN, wBRL and wCOP |

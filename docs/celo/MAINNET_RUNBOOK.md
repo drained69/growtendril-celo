@@ -75,7 +75,7 @@ Check the current cost first:
 npm run celo:deploy
 ```
 
-It must say `"ready": true`. The last estimate was 7.67M gas, about 1.55 CELO, with 2.33 CELO recommended. Then deploy:
+It must say `"ready": true`. The November 25 deployment used about 1.54 CELO. Then deploy:
 
 ```bash
 npm run celo:deploy -- --broadcast --confirm-mainnet

@@ -159,6 +159,17 @@ The contracts are immutable. There's no admin key, upgrade path, pause key or pr
 | Textile FX LimitOrderReactor | `0xa9AA0a64769cBed4d3B1Ceb4Df01CdE915C235b3` |
 | ERC-8004 identity registry | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` |
 
+**Deployed on Celo mainnet** (November 25, 2026, source verified on Sourcify)
+
+| Contract | Address |
+|---|---|
+| GrowthFactory | [`0x22d56660f4b1251012f985c38fef07996175f3b1`](https://celoscan.io/address/0x22d56660f4b1251012f985c38fef07996175f3b1) |
+| GrowthWorkspace (template behind every workspace) | [`0x5F7E160E292E9Dd0077D9dc6B84Bbcc404F5fb1C`](https://celoscan.io/address/0x5F7E160E292E9Dd0077D9dc6B84Bbcc404F5fb1C) |
+| GrowthLedger | [`0x41289019c57389874ee81600c605bdfea671ee5e`](https://celoscan.io/address/0x41289019c57389874ee81600c605bdfea671ee5e) |
+| OutcomeRewardsEscrow | [`0x3157ed9d980dd30f419419145c1fcb481789fe15`](https://celoscan.io/address/0x3157ed9d980dd30f419419145c1fcb481789fe15) |
+
+The deployment record, with transaction hashes and a fingerprint of the deployed source, is in [`contracts/deployments/celo-mainnet.json`](contracts/deployments/celo-mainnet.json).
+
 The full trust model, invariants and known limits are in [the protocol notes](docs/celo/PROTOCOL.md).
 
 ## Celo technology used
@@ -326,7 +337,7 @@ To report a vulnerability, please use GitHub's private security advisory form in
 
 ## Status
 
-The contracts and app are tested end to end on a private fork of Celo mainnet. Mainnet deployment is in progress. [Validation results](docs/celo/VALIDATION.md) lists what has passed and what is not yet verified.
+The contracts are deployed on Celo mainnet and their source is verified. The contracts and app are also tested end to end on a private fork of Celo mainnet. [Validation results](docs/celo/VALIDATION.md) lists what has passed and what is not yet verified.
 
 ## Hackathon
 

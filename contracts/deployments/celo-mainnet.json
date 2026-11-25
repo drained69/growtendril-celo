@@ -1,0 +1,28 @@
+{
+  "network": "Celo mainnet",
+  "chainId": 42220,
+  "deployer": "0x348589d6eE761554F0Afa4c9f00d50Ab00E19300",
+  "compiler": "0.8.30",
+  "optimizerRuns": 200,
+  "evmVersion": "cancun",
+  "sourceSha256": "57153acedcab9abeda8ce39f25fb9f23a50b73c31c0734a1ae128921eb260416",
+  "attributionCode": "celo_bcac2d372bd6",
+  "status": "deployed",
+  "contracts": {
+    "OutcomeRewardsEscrow": {
+      "address": "0x3157ed9d980dd30f419419145c1fcb481789fe15",
+      "transactionHash": "0x0ce72401a474a6a8abea18126ff8211796237e72be7e40b523711f3d11f59465",
+      "block": 83739885
+    },
+    "GrowthFactory": {
+      "address": "0x22d56660f4b1251012f985c38fef07996175f3b1",
+      "transactionHash": "0xac1c864b12dcb863b9b57b4db13bb3b387c7bfd2e9f0854cfa4934592a17b2e8",
+      "block": 83739891
+    },
+    "GrowthLedger": {
+      "address": "0x41289019c57389874ee81600c605bdfea671ee5e",
+      "transactionHash": "0xe149664a6d0042972ab4e9d28c2afa0cd1827abc866d1b87842e9bb1bdfec806",
+      "block": 83739895
+    }
+  }
+}

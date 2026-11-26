@@ -37,7 +37,7 @@ Reference: [Celo ERC-8004 guide](https://docs.celo.org/build-on-celo/build-with-
 
 ## Self identity
 
-Complete [Self Agent ID registration](https://docs.self.xyz/docs/agent-id/) for the **same agent address** used to pay research services, on mainnet. A human must complete the passport proof. An ERC-8004 ID by itself is not Self proof. Do not replace the configured agent key with a newly generated key unless it is the wallet intended for this workspace and identity.
+Complete [Self Agent ID registration](https://docs.self.xyz/docs/agent-id/overview/) for the **same agent address** used to pay research services, on mainnet. A human must complete the passport proof. An ERC-8004 ID by itself is not Self proof. Do not replace the configured agent key with a newly generated key unless it is the wallet intended for this workspace and identity.
 
 After verification, set `SELF_AGENT_ENABLED=1` and run `npm run doctor -- --role=web,buyer` on the web service and `npm run doctor -- --role=seller` on Signals. The command is read-only and exits nonzero until every required check passes, including funding, onchain ERC-8004 ownership and URI, and the Self proof. Self's request signature covers method, path, query and raw body. The service uses SDK signature verification, current human-proof checks, replay protection and per-agent rate limiting; it never trusts a caller-provided wallet address alone.
 

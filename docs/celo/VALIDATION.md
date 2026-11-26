@@ -3,7 +3,7 @@
 ## Not verified
 
 - **No independent human audit.** An automated Plamen audit ran its first 10 of 47 stages and was then stopped to save usage. It produced 97 unverified candidate findings, and each one was checked by hand against the code ([see below](#automated-audit-candidates)). The contracts have also had a line-by-line manual review and the invariant fuzzing below.
-- **Only the contracts are live on mainnet so far.** No ERC-8004 or Self registration, workspace contract, Textile swap, x402 payment, or outside-user payment has taken place yet.
+- **Mainnet use has only started.** The contracts are deployed and the first workspace contract exists. No ERC-8004 or Self registration, Textile swap, x402 payment, or outside-user payment has taken place yet.
 - **The wallet buttons have not been clicked with a real browser wallet.** Their contract calls are tested on a fork, but the wallet popups are not.
 - **The Altana passkey flow is untested live,** and Altana relay attribution is unconfirmed.
 - **No Textile partner key yet.** Conversions from a workspace contract need one. Textile's free price preview works without it.

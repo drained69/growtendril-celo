@@ -135,7 +135,7 @@ Set the printed ID as `CELO_AGENT_ID` and push the settings again. If a receipt 
 
 ## 8. Verify with Self
 
-Complete [Self Agent ID](https://docs.self.xyz/docs/agent-id/) for the **agent wallet**. A person must do the passport proof. Then set `SELF_AGENT_ENABLED=1`, push the settings, and check readiness:
+Complete [Self Agent ID](https://docs.self.xyz/docs/agent-id/overview/) for the **agent wallet**. A person must do the passport proof. Then set `SELF_AGENT_ENABLED=1`, push the settings, and check readiness:
 
 ```bash
 railway run --service web npm run doctor -- --role=web,buyer

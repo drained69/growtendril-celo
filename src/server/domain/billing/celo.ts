@@ -6,14 +6,14 @@ import { CELO } from "@/server/integrations/celo/config";
 export const TRANSFER = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 let client: ReturnType<typeof createPublicClient> | null = null;
-const arc = () => (client ??= createPublicClient({ transport: http(CELO.rpcUrl, { timeout: 15_000, retryCount: 2 }) }));
+const rpc = () => (client ??= createPublicClient({ transport: http(CELO.rpcUrl, { timeout: 15_000, retryCount: 2 }) }));
 
 export const isAddress = (a?: string | null): a is string => !!a && /^0x[0-9a-fA-F]{40}$/.test(a) && !/^0x0{40}$/i.test(a);
 export const isTxHash = (h?: string | null): h is string => !!h && /^0x[0-9a-fA-F]{64}$/.test(h);
 
 export async function currentBlock(): Promise<bigint> {
   await assertCeloMainnet();
-  return arc().getBlockNumber();
+  return rpc().getBlockNumber();
 }
 
 export interface IncomingPayment {
@@ -34,7 +34,7 @@ async function scan(filter: { from?: string; to?: string }, fromBlock: bigint, t
   const CHUNK = 5_000n;
   for (let start = fromBlock; start <= toBlock; start += CHUNK) {
     const end = start + CHUNK - 1n < toBlock ? start + CHUNK - 1n : toBlock;
-    const logs = await arc().getLogs({ address: CELO.usdc as Address, event: TRANSFER, args: { from: filter.from as Address | undefined, to: filter.to as Address | undefined }, fromBlock: start, toBlock: end });
+    const logs = await rpc().getLogs({ address: CELO.usdc as Address, event: TRANSFER, args: { from: filter.from as Address | undefined, to: filter.to as Address | undefined }, fromBlock: start, toBlock: end });
     for (const l of logs) {
       if (l.args.value == null || !l.args.from || !l.args.to) continue;
       out.push({ txHash: l.transactionHash, from: l.args.from, to: l.args.to, amountMicro: Number(l.args.value), blockNumber: l.blockNumber });
@@ -74,7 +74,7 @@ export interface PayoutReceipt {
 /** What a payout transaction actually did on Celo: how much went from `from` to `to`, and what else left `from`. */
 export async function payoutInTx(hash: string, from: string, to: string): Promise<PayoutReceipt> {
   await assertCeloMainnet();
-  const [receipt, tx] = await Promise.all([arc().getTransactionReceipt({ hash: hash as Hash }).catch(() => null), arc().getTransaction({ hash: hash as Hash }).catch(() => null)]);
+  const [receipt, tx] = await Promise.all([rpc().getTransactionReceipt({ hash: hash as Hash }).catch(() => null), rpc().getTransaction({ hash: hash as Hash }).catch(() => null)]);
   if (!receipt) return { status: "pending", toRecipientMicro: 0, elsewhere: [] };
   if (receipt.status !== "success") return { status: "reverted", toRecipientMicro: 0, elsewhere: [], blockNumber: receipt.blockNumber };
   const src = from.toLowerCase();
@@ -92,7 +92,7 @@ export async function payoutInTx(hash: string, from: string, to: string): Promis
 /** What a transaction paid to `to`, in micro-USDC. Null if the transaction failed or isn't mined yet. */
 export async function paymentInTx(hash: string, to: string): Promise<{ amountMicro: number; from: string; blockNumber: bigint } | null> {
   await assertCeloMainnet();
-  const [receipt, tx] = await Promise.all([arc().getTransactionReceipt({ hash: hash as Hash }).catch(() => null), arc().getTransaction({ hash: hash as Hash }).catch(() => null)]);
+  const [receipt, tx] = await Promise.all([rpc().getTransactionReceipt({ hash: hash as Hash }).catch(() => null), rpc().getTransaction({ hash: hash as Hash }).catch(() => null)]);
   if (!receipt || !tx || receipt.status !== "success") return null;
   const target = to.toLowerCase();
   const micro = movesIn(receipt.logs, tx)

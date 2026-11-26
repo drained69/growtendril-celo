@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
 import { BaseError, ContractFunctionRevertedError, erc20Abi, getAddress, isAddress, keccak256, toHex, zeroAddress, type Abi, type Address, type Hash, type Hex } from "viem";
 import { toDataSuffix } from "@celo/attribution-tags";
-import { canonical } from "@arc-growth/evidence";
+import { canonical } from "@growth-tools/evidence";
 import type { DB } from "@/server/db/client";
 import * as s from "@/server/db/schema";
 import { audit } from "@/server/db/helpers";

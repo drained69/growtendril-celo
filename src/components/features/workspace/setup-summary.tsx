@@ -23,7 +23,7 @@ export function SetupSummary({
   scanStatus?: string | null;
   /** Billing is on and the balance can't cover a scan, so the first one is waiting. */
   lowCredit?: boolean;
-  /** e.g. "Daily · ≈ 2 USDC/day" */
+  /** e.g. "Daily · ≈ 1 USDC/day" */
   autopilot?: string;
 }) {
   let host = "your description";

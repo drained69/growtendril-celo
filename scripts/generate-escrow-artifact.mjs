@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 
 const source = "contracts/out/OutcomeRewardsEscrow.sol/OutcomeRewardsEscrow.json";
-const target = "packages/arc-growth-tools/src/escrow-artifact.ts";
+const target = "packages/growth-tools/src/escrow-artifact.ts";
 const artifact = JSON.parse(await readFile(source, "utf8"));
 const ranges = Object.values(artifact.deployedBytecode.immutableReferences).flat();
 const body = [

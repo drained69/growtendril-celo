@@ -7,8 +7,8 @@ import { CELO } from "@/server/integrations/celo/config";
 import { newId } from "@/server/lib/ids";
 import { audit } from "@/server/db/helpers";
 import { recordConversion } from "@/server/domain/growth/attribution";
-import { commerceEventKey, reduceCommerce, type CommerceEvent } from "@arc-growth/commerce";
-import { COMMERCE_ABI } from "@arc-growth/commerce-abi";
+import { commerceEventKey, reduceCommerce, type CommerceEvent } from "@growth-tools/commerce";
+import { COMMERCE_ABI } from "@growth-tools/commerce-abi";
 
 const address = z.string().regex(/^0x[\da-f]{40}$/i).refine(v => !/^0x0{40}$/i.test(v), "Use a nonzero address").transform(v => v.toLowerCase());
 export const CommerceSettings = z.object({ chainId: z.coerce.number().refine(n => n === CELO.chainId || n === 11142220, "Select Celo mainnet or testnet"), contract: address, merchantAddress: address });

@@ -75,7 +75,7 @@ export default async function Billing() {
             <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-ink-3">
               Top up USDC on Celo once, then pay only for what runs. Each service has one fixed price, taken from your balance when it runs — whoever on your team starts it. Browsing, settings, team and exports are free.
             </p>
-            {mode !== "off" && <p className="mt-2 max-w-2xl text-[12.5px] leading-relaxed text-ink-3">Scan credit is separate from your workspace wallet. To use wallet USDC for a scan, create a 2 USDC invoice here and choose &ldquo;Pay from workspace wallet&rdquo; on its payment page. You approve the transfer by email, and credit is added after Celo confirms it. The exact invoice amount includes a small identifying suffix; the workspace wallet also keeps 0.05 USDC for Celo fees.</p>}
+            {mode !== "off" && <p className="mt-2 max-w-2xl text-[12.5px] leading-relaxed text-ink-3">Scan credit is separate from your workspace wallet. To use wallet USDC for a scan, create a {SERVICES.scan.priceUsdc} USDC invoice here and choose &ldquo;Pay from workspace wallet&rdquo; on its payment page. You approve the transfer by email, and credit is added after Celo confirms it. The exact invoice amount includes a small identifying suffix; the workspace wallet also keeps 0.05 USDC for Celo fees.</p>}
           </div>
 
           {mode === "off" && (
@@ -98,7 +98,7 @@ export default async function Billing() {
           )}
           {scheduledWorkspaces.length > 0 && mode === "celo" && (
             <Callout tone="warn" title="Autopilot can use new credit automatically" action={<LinkButton href="/app/settings#autopilot" size="sm" variant="secondary">Autopilot settings</LinkButton>}>
-              {scheduledWorkspaces.map((p) => p.name).join(", ")} {scheduledWorkspaces.length === 1 ? "has" : "have"} Autopilot enabled. A due market scan may start as soon as your top-up settles and use 2 USDC. Pause Autopilot before paying if you want to run the scan yourself.
+              {scheduledWorkspaces.map((p) => p.name).join(", ")} {scheduledWorkspaces.length === 1 ? "has" : "have"} Autopilot enabled. A due market scan may start as soon as your top-up settles and use {SERVICES.scan.priceUsdc} USDC. Pause Autopilot before paying if you want to run the scan yourself.
             </Callout>
           )}
           {latestTopup && latestCharge && balance < servicePriceMicro("scan") && (
@@ -144,7 +144,7 @@ export default async function Billing() {
             <Card>
               <CardHeader title="Add credit" description={mode === "celo" ? "Create a Celo USDC invoice. Credit appears after your payment is confirmed." : "Choose an amount."} icon={<Sparkles />} />
               <CardBody>
-                {mode === "off" ? <p className="text-[12.5px] text-ink-3">Nothing to pay while billing is off.</p> : <div className="space-y-3"><TopUpForm mode={mode} suggested={balance === 0 ? 10 : undefined} />{mode === "celo" && owned && balance < servicePriceMicro("scan") && <TopUpButton usdc={2} mode="celo" label="Create invoice to fund one scan" />}</div>}
+                {mode === "off" ? <p className="text-[12.5px] text-ink-3">Nothing to pay while billing is off.</p> : <div className="space-y-3"><TopUpForm mode={mode} suggested={balance === 0 ? 10 : undefined} />{mode === "celo" && owned && balance < servicePriceMicro("scan") && <TopUpButton usdc={SERVICES.scan.priceUsdc} mode="celo" label="Create invoice to fund one scan" />}</div>}
               </CardBody>
             </Card>
           </div>

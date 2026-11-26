@@ -102,10 +102,10 @@ describe("policy engine", () => {
   });
 
   it("keeps approval mandatory even when a stored policy permits autonomous spend", () => {
-    const oldPolicy = { ...DEFAULT_POLICY, maxTransactionMicro: toMicro(500), hardCeilingMicro: toMicro(500), autonomousCategories: ["research"], approvalCategories: [], allowedChains: ["Celo", "Arc_Testnet"] };
+    const oldPolicy = { ...DEFAULT_POLICY, maxTransactionMicro: toMicro(500), hardCeilingMicro: toMicro(500), autonomousCategories: ["research"], approvalCategories: [], allowedChains: ["Celo", "Base_Sepolia"] };
     const request = purchase("0.01").data!;
     expect(evaluatePolicy(request, oldPolicy, state()).verdict).toBe("APPROVAL_REQUIRED");
-    const legacyRequest = parseFinancialAction({ ...request, chain: "Arc_Testnet" });
+    const legacyRequest = parseFinancialAction({ ...request, chain: "Base_Sepolia" });
     expect(evaluatePolicy(legacyRequest.data!, oldPolicy, state(), { founderApproved: true }).verdict).toBe("DENY");
     expect(evaluatePolicy(send("11").data!, oldPolicy, state(), { founderApproved: true }).verdict).toBe("DENY");
   });

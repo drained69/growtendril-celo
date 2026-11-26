@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { encodeAbiParameters, encodeEventTopics, type Hex } from "viem";
-import { COMMERCE_ABI } from "../packages/arc-growth-tools/src/commerce-abi";
+import { COMMERCE_ABI } from "../packages/growth-tools/src/commerce-abi";
 import type { DB } from "@/server/db/client";
-import { type CommerceEvent } from "../packages/arc-growth-tools/src/commerce";
+import { type CommerceEvent } from "../packages/growth-tools/src/commerce";
 process.env.PGLITE_DIR = "memory://";
 let db: DB, s: typeof import("@/server/db/schema"), flow: typeof import("@/server/domain/growth/commerce");
 const contract = `0x${"1".repeat(40)}`, merchantAddress = `0x${"3".repeat(40)}`, paymentId = `0x${"4".repeat(64)}`;

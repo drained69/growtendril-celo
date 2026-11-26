@@ -8,7 +8,7 @@ import { verifyTransfers, createReceipt, verifyReceipt } from "../dist/evidence.
 
 const address = `0x${"1".repeat(40)}`;
 const hash = `0x${"2".repeat(64)}`;
-const event = (operation, amountMicro, logIndex) => ({ chainId: 5042, contract: address, paymentId: "order-1", txHash: hash, logIndex, blockNumber: "1", occurredAt: "2026-10-16T00:00:00Z", operation, amountMicro });
+const event = (operation, amountMicro, logIndex) => ({ chainId: 42220, contract: address, paymentId: "order-1", txHash: hash, logIndex, blockNumber: "1", occurredAt: "2026-10-16T00:00:00Z", operation, amountMicro });
 
 test("replay and refund preserve one net purchase", () => {
   const capture = event("Charged", 10_000_000, 0);
@@ -23,8 +23,8 @@ test("replay and refund preserve one net purchase", () => {
 });
 
 test("approval cannot override a hard policy rule", () => {
-  const intent = { id: "reward", scope: "campaign", recipient: address, asset: "USDC", chainId: 5042, amountMicro: 5, category: "creator", expiresAt: 100 };
-  const policy = { frozen: false, allowedChains: [5042], allowedAssets: ["USDC"], allowedRecipients: [address], allowedCategories: ["creator"], hardLimitMicro: 10, budgetMicro: 10, dailyLimitMicro: 10, approvalAboveMicro: 0, alwaysReviewCategories: ["creator"] };
+  const intent = { id: "reward", scope: "campaign", recipient: address, asset: "USDC", chainId: 42220, amountMicro: 5, category: "creator", expiresAt: 100 };
+  const policy = { frozen: false, allowedChains: [42220], allowedAssets: ["USDC"], allowedRecipients: [address], allowedCategories: ["creator"], hardLimitMicro: 10, budgetMicro: 10, dailyLimitMicro: 10, approvalAboveMicro: 0, alwaysReviewCategories: ["creator"] };
   const approval = { intent, approver: "owner", approvedAt: 1 };
   assert.equal(evaluateSpend(intent, policy, { committedMicro: 0, spentTodayMicro: 0 }, 2).verdict, "APPROVAL_REQUIRED");
   assert.equal(evaluateSpend(intent, policy, { committedMicro: 0, spentTodayMicro: 0 }, 2, approval).verdict, "ALLOW");
@@ -33,8 +33,8 @@ test("approval cannot override a hard policy rule", () => {
 });
 
 test("reservation and execution call an injected wallet once", async () => {
-  const intent = { id: "reward", scope: "campaign", recipient: address, asset: "USDC", chainId: 5042, amountMicro: 5, category: "creator", expiresAt: 100 };
-  const policy = { frozen: false, allowedChains: [5042], allowedAssets: ["USDC"], allowedRecipients: [address], allowedCategories: ["creator"], hardLimitMicro: 10, budgetMicro: 10, dailyLimitMicro: 10, approvalAboveMicro: 10, alwaysReviewCategories: [] };
+  const intent = { id: "reward", scope: "campaign", recipient: address, asset: "USDC", chainId: 42220, amountMicro: 5, category: "creator", expiresAt: 100 };
+  const policy = { frozen: false, allowedChains: [42220], allowedAssets: ["USDC"], allowedRecipients: [address], allowedCategories: ["creator"], hardLimitMicro: 10, budgetMicro: 10, dailyLimitMicro: 10, approvalAboveMicro: 10, alwaysReviewCategories: [] };
   const entries = new Map();
   let lock = Promise.resolve();
   const store = {
@@ -52,8 +52,8 @@ test("reservation and execution call an injected wallet once", async () => {
 });
 
 test("payment evidence and receipt require exact transfer and trusted key", () => {
-  const expected = { chainId: 5042, asset: "USDC", sender: address, recipient: `0x${"3".repeat(40)}`, amountMicro: 5 };
-  const observed = { status: "confirmed", chainId: 5042, txHash: hash, transfers: [expected] };
+  const expected = { chainId: 42220, asset: "USDC", sender: address, recipient: `0x${"3".repeat(40)}`, amountMicro: 5 };
+  const observed = { status: "confirmed", chainId: 42220, txHash: hash, transfers: [expected] };
   assert.equal(verifyTransfers(expected, observed).status, "verified");
   assert.equal(verifyTransfers(expected, { ...observed, transfers: [...observed.transfers, { ...expected, recipient: address, amountMicro: 1 }] }).status, "mismatch");
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");

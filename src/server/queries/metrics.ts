@@ -8,7 +8,7 @@ import * as s from "@/server/db/schema";
  */
 export async function tractionMetrics(db: DB, opts: { includeDemo?: boolean } = {}) {
   const ids = (await db.select({ id: s.projects.id, mode: s.projects.dataMode }).from(s.projects)).filter((p) => opts.includeDemo || p.mode !== "DEMO").map((p) => p.id);
-  const zero = { projects: 0, opportunities: 0, qualified: 0, kols: 0, experiments: 0, spentMicro: 0, x402: 0, arcTx: 0, conversions: 0, costPerConversion: null as number | null, decisions: 0, autonomous: 0, approvals: 0 };
+  const zero = { projects: 0, opportunities: 0, qualified: 0, kols: 0, experiments: 0, spentMicro: 0, x402: 0, celoTx: 0, conversions: 0, costPerConversion: null as number | null, decisions: 0, autonomous: 0, approvals: 0 };
   if (!ids.length) return zero;
   const n = async (q: Promise<{ n: number }[]>) => (await q)[0]?.n ?? 0;
   const c = sql<number>`count(*)::int`;
@@ -24,7 +24,7 @@ export async function tractionMetrics(db: DB, opts: { includeDemo?: boolean } = 
     experiments: await n(db.select({ n: c }).from(s.experiments).where(inArray(s.experiments.projectId, ids))),
     spentMicro,
     x402: await n(db.select({ n: c }).from(s.transactions).where(and(realTx, eq(s.transactions.rail, "celo_x402")))),
-    arcTx: await n(db.select({ n: c }).from(s.transactions).where(and(realTx, inArray(s.transactions.rail, ["celo_usdc_send", "app_kit_bridge"])))),
+    celoTx: await n(db.select({ n: c }).from(s.transactions).where(and(realTx, inArray(s.transactions.rail, ["celo_usdc_send", "app_kit_bridge"])))),
     conversions,
     costPerConversion: conversions && spentMicro ? spentMicro / conversions : null,
     decisions: await n(db.select({ n: c }).from(s.agentDecisions).where(inArray(s.agentDecisions.projectId, ids))),

@@ -1,5 +1,5 @@
-/** Read-only Arc mainnet ERC-20 USDC receipt verifier. Never signs or sends a transaction. */
-import { verifyTransfers } from "@growtendril/arc-growth-tools/evidence";
+/** Read-only Celo mainnet ERC-20 USDC receipt verifier. Never signs or sends a transaction. */
+import { verifyTransfers } from "@growtendril/growth-tools/evidence";
 
 const [hash, sender, recipient, amountUsdc] = process.argv.slice(2);
 const address = /^0x[\da-f]{40}$/i;
@@ -8,7 +8,7 @@ if (!/^0x[\da-f]{64}$/i.test(hash ?? "") || !address.test(sender ?? "") || !addr
   process.exit(2);
 }
 
-const rpc = process.env.ARC_MAINNET_RPC || "https://rpc.mainnet.arc.io";
+const rpc = process.env.CELO_MAINNET_RPC || "https://forno.celo.org";
 let requestId = 0;
 async function rpcCall(method, params = []) {
   const response = await fetch(rpc, {
@@ -17,15 +17,15 @@ async function rpcCall(method, params = []) {
     body: JSON.stringify({ jsonrpc: "2.0", id: ++requestId, method, params }),
     signal: AbortSignal.timeout(15_000),
   });
-  if (!response.ok) throw new Error(`Arc RPC HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Celo RPC HTTP ${response.status}`);
   const body = await response.json();
-  if (body.error) throw new Error(`Arc RPC ${method}: ${body.error.message ?? "request failed"}`);
-  if (body.result === undefined) throw new Error(`Arc RPC ${method} returned no result`);
+  if (body.error) throw new Error(`Celo RPC ${method}: ${body.error.message ?? "request failed"}`);
+  if (body.result === undefined) throw new Error(`Celo RPC ${method} returned no result`);
   return body.result;
 }
 
 const chainId = Number(BigInt(await rpcCall("eth_chainId")));
-if (chainId !== 5042) throw new Error(`Expected Arc mainnet (5042), got ${chainId}`);
+if (chainId !== 42220) throw new Error(`Expected Celo mainnet (42220), got ${chainId}`);
 const receipt = await rpcCall("eth_getTransactionReceipt", [hash]);
 if (!receipt?.blockNumber || !receipt.blockHash) throw new Error("Transaction has no mined receipt");
 const canonicalBlock = await rpcCall("eth_getBlockByNumber", [receipt.blockNumber, false]);
@@ -34,7 +34,7 @@ const blockNumber = BigInt(receipt.blockNumber);
 const latest = BigInt(await rpcCall("eth_blockNumber"));
 if (latest - blockNumber < 6n) throw new Error("Wait for at least six later blocks before checking this transfer");
 
-const usdc = "0x3600000000000000000000000000000000000000";
+const usdc = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C";
 const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const transfers = receipt.logs.flatMap((log) => {
   if (log.address.toLowerCase() !== usdc.toLowerCase()) return [];
@@ -50,5 +50,5 @@ const result = verifyTransfers(
   { chainId, asset: usdc, sender, recipient, amountMicro: Number(expectedMicro) },
   { status: receipt.status === "0x1" ? "confirmed" : "reverted", chainId, txHash: hash, blockNumber: blockNumber.toString(), transfers },
 );
-console.log(JSON.stringify({ network: "Arc mainnet", txHash: hash, blockNumber: blockNumber.toString(), confirmations: (latest - blockNumber + 1n).toString(), result }, null, 2));
+console.log(JSON.stringify({ network: "Celo mainnet", txHash: hash, blockNumber: blockNumber.toString(), confirmations: (latest - blockNumber + 1n).toString(), result }, null, 2));
 if (result.status !== "verified") process.exitCode = 1;

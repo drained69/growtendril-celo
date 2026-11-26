@@ -2,8 +2,8 @@ import { eq, sql } from "drizzle-orm";
 import { keccak256, toHex } from "viem";
 import { toDataSuffix } from "@celo/attribution-tags";
 import * as s from "@/server/db/schema";
-import { canonical } from "@arc-growth/evidence";
-import { calculateReward } from "@arc-growth/outcomes";
+import { canonical } from "@growth-tools/evidence";
+import { calculateReward } from "@growth-tools/outcomes";
 
 import type { DB } from "@/server/db/client";
 import { programById, campaignParticipants, qualifiedOutcomes } from "@/server/domain/growth/creator-campaigns";

@@ -110,13 +110,13 @@ const pending = () => db.select().from(s.approvals).where(and(eq(s.approvals.pro
 const txOf = async (id: string) => (await db.select().from(s.transactions).where(eq(s.transactions.id, id)))[0];
 const exceptions = (kind?: string) => db.select().from(s.ledgerExceptions).where(kind ? eq(s.ledgerExceptions.kind, kind) : undefined);
 
-/** Propose the next payment for an experiment and approve it as `userId`. Celo will show `arc` for it. */
-async function payNext(expId: string, userId: string, arc: (txHash: string) => Receipt, tranche: "first" | "second" = "first") {
+/** Propose the next payment for an experiment and approve it as `userId`. Celo will show `receiptFor` for it. */
+async function payNext(expId: string, userId: string, receiptFor: (txHash: string) => Receipt, tranche: "first" | "second" = "first") {
   const r = await x.launchExperiment(db, { projectId: "p1", experimentId: expId, tranche });
   expect(r.verdict).toBe("APPROVAL_REQUIRED");
   const ap = (await pending()).find((a) => a.decisionId === r.decisionId)!;
   const before = chain.nextHash;
-  chain.receipts.set(hash(before), arc(hash(before)));
+  chain.receipts.set(hash(before), receiptFor(hash(before)));
   const res = await exec.resolveApproval(db, { approvalId: ap.id, userId, resolution: "approve" });
   return { ap, res, tx: await txOf(ap.transactionId!) };
 }

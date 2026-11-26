@@ -5,7 +5,7 @@ import type { DB } from "@/server/db/client";
 import * as s from "@/server/db/schema";
 import { CELO } from "@/server/integrations/celo/config";
 import { newId } from "@/server/lib/ids";
-import { recipientMessage } from "@arc-growth/recipient";
+import { recipientMessage } from "@growth-tools/recipient";
 import { invitation } from "@/server/domain/growth/creator-campaigns";
 
 export function creatorPasskeyConfig() {

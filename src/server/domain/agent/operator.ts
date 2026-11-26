@@ -39,7 +39,7 @@ export async function runCycle(db: DB, projectId: string, opts: { trigger?: "man
 
     // Keep the live service catalog fresh.
     const mk = await refreshMarketplace(db);
-    log("operator", mk.error ? `Agent Marketplace unreachable: ${mk.error}` : `Agent Marketplace: ${mk.found} services, ${mk.arcPayable} payable on Celo`);
+    log("operator", mk.error ? `Agent Marketplace unreachable: ${mk.error}` : `Agent Marketplace: ${mk.found} services, ${mk.celoPayable} payable on Celo`);
 
     const settle = await refreshSettlements(db, projectId);
     if (settle.checked) log("operator", `Checked ${settle.checked} in-flight settlement(s), ${settle.updated} updated`);

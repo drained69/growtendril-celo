@@ -20,5 +20,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     [receipt] = await db.select().from(s.decisionReceipts).where(and(eq(s.decisionReceipts.projectId, project.id), eq(s.decisionReceipts.decisionId, id)));
     if (!receipt || sha256(canonicalJson(receipt.body)) !== receipt.digest) return NextResponse.json({ error: "receipt refresh failed" }, { status: 409 });
   }
-  return NextResponse.json(portableReceipt({ ...receipt.body, workspaceId: project.id, decisionId: id, exportedAt: new Date().toISOString(), finalizedAt: receipt.finalizedAt?.toISOString() ?? null }), { headers: { "cache-control": "private, no-store", "content-disposition": 'attachment; filename="arc-growth-receipt.json"' } });
+  return NextResponse.json(portableReceipt({ ...receipt.body, workspaceId: project.id, decisionId: id, exportedAt: new Date().toISOString(), finalizedAt: receipt.finalizedAt?.toISOString() ?? null }), { headers: { "cache-control": "private, no-store", "content-disposition": 'attachment; filename="growtendril-receipt.json"' } });
 }

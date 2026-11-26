@@ -26,8 +26,8 @@
       "@/*": [
         "./src/*"
       ],
-      "@arc-growth/*": [
-        "./packages/arc-growth-tools/dist/*"
+      "@growth-tools/*": [
+        "./packages/growth-tools/dist/*"
       ]
     }
   },
@@ -48,6 +48,6 @@
     "node_modules",
     ".data",
     "video",
-    "packages/arc-growth-tools/dist"
+    "packages/growth-tools/dist"
   ]
 }

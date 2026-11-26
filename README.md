@@ -487,7 +487,7 @@ src/
     jobs/                   Scheduler, queue and background worker
     security/               Encryption, HMAC and safe outbound HTTP
 services/signals-api/       Optional paid research API (x402 and Self)
-packages/arc-growth-tools/  Shared toolkit: escrow artifact, outcome, policy and evidence helpers
+packages/growth-tools/      Shared toolkit: escrow artifact, outcome, policy and evidence helpers
 scripts/                    Deploy, register, readiness, end-to-end, settings and reconciliation scripts
 drizzle/                    Database migrations
 tests/                      Application tests
@@ -593,7 +593,7 @@ None of these send a real transaction. `celo:e2e` and `--rehearse` need `anvil` 
 
 | Suite | Coverage |
 |---|---|
-| Application tests | 421 tests in 46 files: payments, policy, receipts, x402, Textile FX, Self, Altana, billing, authentication, security boundaries and the growth domain |
+| Application tests | 411 tests in 44 files: payments, policy, receipts, x402, Textile FX, Self, Altana, billing, authentication, security boundaries and the growth domain |
 | Contract tests | 52 Foundry tests, including 11 invariant tests |
 | Invariant fuzzing | 11 safety rules, each checked across 512,000 random actions with the agent's key treated as stolen |
 | Forked-USDC test | The escrow against the real Celo USDC contract |
@@ -678,7 +678,7 @@ Changes to the contracts should include tests, and any change to an onchain guar
 
 ## License
 
-The repository root has no license yet, so all rights are reserved by default. [`packages/arc-growth-tools`](packages/arc-growth-tools) is licensed under Apache 2.0.
+The repository root has no license yet, so all rights are reserved by default. [`packages/growth-tools`](packages/growth-tools) is licensed under Apache 2.0.
 
 ## Acknowledgements
 

@@ -83,7 +83,7 @@ export const emailLog = pgTable(
 export const subscriptions = pgTable("subscriptions", {
   id: id(),
   userId: text("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  provider: text("provider").notNull().default("celo"), // arc | dev
+  provider: text("provider").notNull().default("celo"), // celo | dev
   plan: text("plan").notNull(), // starter | growth
   status: text("status").notNull(), // active | past_due (grace after the period ends) | canceled
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),

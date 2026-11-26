@@ -17,7 +17,7 @@ import { createPublicClient, createTestClient, createWalletClient, encodeAbiPara
 import { celo } from "viem/chains";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { toDataSuffix } from "@celo/attribution-tags";
-import { isOutcomeEscrowCode, OUTCOME_ESCROW_ABI } from "../packages/arc-growth-tools/dist/escrow.js";
+import { isOutcomeEscrowCode, OUTCOME_ESCROW_ABI } from "../packages/growth-tools/dist/escrow.js";
 import { GROWTH_FACTORY_ABI, GROWTH_LEDGER_ABI, GROWTH_WORKSPACE_ABI } from "../src/lib/celo-protocol-abi";
 import { CELO } from "../src/server/integrations/celo/config";
 import { PAYOUT_TOKENS, TEXTILE_REACTOR, USDT } from "../src/server/integrations/celo/corridors";
@@ -47,7 +47,7 @@ function compiled() {
   if (spawnSync("forge", ["build", "--silent"], {cwd: "contracts", encoding: "utf8"}).status !== 0) throw new Error("forge build failed. Install Foundry and check the contracts.");
   const load = (name: Name) => JSON.parse(readFileSync(`contracts/out/${artifactFile[name]}`, "utf8")) as {bytecode: {object: Hex}; deployedBytecode: {object: Hex}};
   const out = {OutcomeRewardsEscrow: load("OutcomeRewardsEscrow"), GrowthFactory: load("GrowthFactory"), GrowthLedger: load("GrowthLedger")};
-  if (!isOutcomeEscrowCode(out.OutcomeRewardsEscrow.deployedBytecode.object)) throw new Error("The compiled escrow differs from the app's artifact. Run npm run arc:contracts:generate.");
+  if (!isOutcomeEscrowCode(out.OutcomeRewardsEscrow.deployedBytecode.object)) throw new Error("The compiled escrow differs from the app's artifact. Run npm run contracts:generate.");
   return out;
 }
 const artifacts = compiled();

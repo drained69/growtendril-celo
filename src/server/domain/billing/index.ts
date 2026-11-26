@@ -16,7 +16,7 @@ import { resolveByRef } from "@/server/domain/reconcile/exceptions";
  * it runs, whoever on the team starts it. A top-up is an invoice for an exact amount: GrowTendril
  * sees the transfer arrive on Celo (or checks the transaction hash the payer gives) and credits it.
  *
- *   arc → BILLING_CELO_ADDRESS is set: services cost credit, top-ups are paid to that Celo address.
+ *   celo → BILLING_CELO_ADDRESS is set: services cost credit, top-ups are paid to that Celo address.
  *   dev → development only, BILLING_DEV=1: services cost credit; "Top up" credits it for free.
  *   off → neither: every service is free.
  */
@@ -38,7 +38,7 @@ export function billingMode(): BillingMode {
   return "off";
 }
 
-/** "Label · 2 USDC" while billing is on, so paid buttons say what they cost. */
+/** "Label · 1 USDC" while billing is on, so paid buttons say what they cost. */
 export function priced(label: string, service: ServiceKey): string {
   return billingMode() === "off" ? label : `${label} · ${SERVICES[service].priceUsdc} USDC`;
 }
@@ -144,7 +144,7 @@ async function receiptEmail(db: DB, userId: string, v: { amountMicro: number; tx
     userId,
     kind: "credit_added",
     subject: `Payment received — ${fmtUsdc(v.amountMicro)} added to your GrowTendril balance`,
-    text: `Hi ${u.name.split(" ")[0] || "there"},\n\nThanks — ${fmtUsdc(v.amountMicro)} is now on your GrowTendril balance (${fmtUsdc(balance)} at the moment this receipt was sent).${scheduled ? "\n\nAutopilot is enabled in one of your workspaces. A scheduled market scan may use 2 USDC of this credit immediately if a run is due; check Billing activity for your current balance." : ""}\n\nReceipt: ${(v.amountMicro / 1e6).toFixed(6)} USDC on Celo\nTransaction: ${txExplorerUrl(v.chain, v.txHash)}`,
+    text: `Hi ${u.name.split(" ")[0] || "there"},\n\nThanks — ${fmtUsdc(v.amountMicro)} is now on your GrowTendril balance (${fmtUsdc(balance)} at the moment this receipt was sent).${scheduled ? `\n\nAutopilot is enabled in one of your workspaces. A scheduled market scan may use ${SERVICES.scan.priceUsdc} USDC of this credit immediately if a run is due; check Billing activity for your current balance.` : ""}\n\nReceipt: ${(v.amountMicro / 1e6).toFixed(6)} USDC on Celo\nTransaction: ${txExplorerUrl(v.chain, v.txHash)}`,
     action: app ? { label: "Open billing", url: `${app}/billing` } : undefined,
   }).catch((e) => console.warn(`[billing] receipt email failed: ${(e as Error).message}`));
 }

@@ -1,5 +1,5 @@
 {
-  "name": "arc-builder-starter",
+  "name": "growth-tools-example",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,6 +9,6 @@
     "test": "node --test verify-transfer.test.mjs"
   },
   "dependencies": {
-    "@growtendril/arc-growth-tools": "file:../.."
+    "@growtendril/growth-tools": "file:../.."
   }
 }

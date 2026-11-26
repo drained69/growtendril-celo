@@ -32,7 +32,7 @@ type Body = {
 
 const RAIL = RAIL_LABEL;
 const humanize = (k: string) => k.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
-const NETWORK_KEY: Record<string, string> = { "Celo Mainnet": "Celo", "Celo Testnet": "Arc_Testnet", "Base Sepolia": "Base_Sepolia", "Arbitrum Sepolia": "Arbitrum_Sepolia", "Ethereum Sepolia": "Ethereum_Sepolia" };
+const NETWORK_KEY: Record<string, string> = { "Celo Mainnet": "Celo", "Base Sepolia": "Base_Sepolia", "Arbitrum Sepolia": "Arbitrum_Sepolia", "Ethereum Sepolia": "Ethereum_Sepolia" };
 
 export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

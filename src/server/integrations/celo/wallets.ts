@@ -6,7 +6,7 @@ import { newId } from "@/server/lib/ids";
 import { CELO } from "./config";
 import { signerFor } from "./signer";
 import { agentAccount, assertCeloMainnet, operatorProblem } from "./client";
-import { arcUsdcBalanceMicro } from "./wallet-balance";
+import { celoUsdcBalanceMicro } from "./wallet-balance";
 export type Wallet = typeof s.wallets.$inferSelect;
 
 export async function getWallet(db: DB, projectId: string): Promise<Wallet | null> {
@@ -72,7 +72,7 @@ export async function attachCircleWallet(db: DB, a: {projectId: string; userId: 
 export interface WalletBalances {walletMicro: number | null; gatewayMicro: number | null; errors: string[]}
 export async function walletBalances(w: Wallet | null): Promise<WalletBalances> {
   if (!w?.address || w.blockchain !== "CELO") return {walletMicro: null, gatewayMicro: null, errors: []};
-  try { const micro = await arcUsdcBalanceMicro(w.address); return {walletMicro: micro, gatewayMicro: micro, errors: []}; }
+  try { const micro = await celoUsdcBalanceMicro(w.address); return {walletMicro: micro, gatewayMicro: micro, errors: []}; }
   catch { return {walletMicro: null, gatewayMicro: null, errors: ["Celo RPC balance unavailable"]}; }
 }
 export async function depositToGateway(_w: Wallet, _amount: string): Promise<{approveTx: string | null; depositTx: string}> {

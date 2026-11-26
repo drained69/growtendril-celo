@@ -22,7 +22,7 @@ import { PayInvoice } from "@/components/features/billing/pay-invoice";
 import { PayWorkspaceWallet } from "@/components/features/billing/pay-workspace-wallet";
 import { TopUpButton } from "@/components/features/billing/top-up";
 import { withdrawable } from "@/server/domain/agent/withdraw";
-import { servicePriceMicro } from "@/lib/services";
+import { SERVICES, servicePriceMicro } from "@/lib/services";
 import { getWallet, walletIsLive } from "@/server/integrations/celo/wallets";
 
 export const dynamic = "force-dynamic";
@@ -130,7 +130,7 @@ export default async function PayInvoicePage({ params }: { params: Promise<{ id:
                 ]}
               />
               <Callout tone="info">Send on Celo only. USDC sent on another network can&apos;t be matched to your top-up. Celo&apos;s network fee is also paid in USDC (usually under a cent), so keep a little more than this amount in your wallet.</Callout>
-              {scheduled.length > 0 && <Callout tone="warn" title="Autopilot may use this top-up immediately">{scheduled.map((p) => p.name).join(", ")} {scheduled.length === 1 ? "has" : "have"} scheduled scans enabled. A due scan can take 2 USDC of your credit as soon as this payment confirms. <Link href="/app/settings#autopilot" className="underline">Review Autopilot settings</Link> before paying if you want to start the scan yourself.</Callout>}
+              {scheduled.length > 0 && <Callout tone="warn" title="Autopilot may use this top-up immediately">{scheduled.map((p) => p.name).join(", ")} {scheduled.length === 1 ? "has" : "have"} scheduled scans enabled. A due scan can take {SERVICES.scan.priceUsdc} USDC of your credit as soon as this payment confirms. <Link href="/app/settings#autopilot" className="underline">Review Autopilot settings</Link> before paying if you want to start the scan yourself.</Callout>}
               {walletFunds && <PayWorkspaceWallet invoiceId={inv.id} amountMicro={inv.amountMicro} availableMicro={walletFunds.availableMicro} balanceMicro={walletFunds.balanceMicro} />}
               {walletUnavailable && <Callout tone="warn">{walletUnavailable}</Callout>}
               <PayInvoice attributionCode={process.env.CELO_ATTRIBUTION_CODE ?? null} invoiceId={inv.id} payTo={inv.payTo} amountMicro={inv.amountMicro} usdc={CELO.usdc} chainId={CELO.chainId} rpcUrl={CELO.publicRpcUrl} explorer={CELO.explorer} next={paymentNext} />

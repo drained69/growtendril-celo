@@ -43,7 +43,7 @@ describe("Celo deployment payment boundaries", () => {
     configure();
     const wallet={provider:"celo_eoa",address:privateKeyToAccount(key).address,circleWalletId:null,blockchain:"CELO",dataMode:"LIVE"};
     expect(signerFor(wallet)).not.toBeNull();
-    expect(signerFor({...wallet,blockchain:"ARC"})).toBeNull();
+    expect(signerFor({...wallet,blockchain:"BASE"})).toBeNull();
     expect(signerFor({...wallet,address:seller})).toBeNull();
   });
   it("signs Celo USDC with the official x402 scheme and returns an onchain hash", async () => {
@@ -59,7 +59,7 @@ describe("Celo deployment payment boundaries", () => {
   });
   it("rejects other networks and assets before signing", async () => {
     const {quote}=await import("@/server/integrations/celo/x402");
-    transport.network="eip155:5042";expect((await quote("https://research.example.com/")).kind).toBe("unsupported");
+    transport.network="eip155:8453";expect((await quote("https://research.example.com/")).kind).toBe("unsupported");
     transport.network=CELO.caip2;transport.asset=seller;expect((await quote("https://research.example.com/")).kind).toBe("unsupported");
   });
   it("fails Self verification for missing or expired signatures before network access", async () => {

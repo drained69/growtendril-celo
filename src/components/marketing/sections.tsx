@@ -577,7 +577,7 @@ export function Finale({ startHref, signedIn }: { startHref: string; signedIn: b
 export function Footer({ startHref, signedIn }: { startHref: string; signedIn: boolean }) {
   const cols: [string, [string, string][]][] = [
     ["Product", [["What it does", "#product"], ["How a cycle works", "#how"], ["Creators", "#creators"], ["Pricing", "#pricing"]]],
-    ["Trust", [["Your rules", "#controls"], ["Receipts", "#receipts"], ["On your terms", "#terms"], ["Open growth toolkit", "https://github.com/drained69/arc-growth-tools"], ["Questions", "#faq"]]],
+    ["Trust", [["Your rules", "#controls"], ["Receipts", "#receipts"], ["On your terms", "#terms"], ["Open growth toolkit", "https://github.com/drained69/growtendril-celo/tree/main/packages/growth-tools"], ["Questions", "#faq"]]],
     ["Account", signedIn ? [["Open workspace", "/app"]] : [["Sign in", "/login"], ["Create account", "/signup"], ["Start a mission", startHref]]],
   ];
   return (

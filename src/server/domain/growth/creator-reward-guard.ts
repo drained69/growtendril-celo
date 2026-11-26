@@ -3,7 +3,7 @@ import type { DB } from "@/server/db/client";
 import * as s from "@/server/db/schema";
 import type { SendPaymentAction } from "@/server/domain/agent/actions";
 import { toMicro } from "@/lib/money";
-import { calculateReward } from "@arc-growth/outcomes";
+import { calculateReward } from "@growth-tools/outcomes";
 
 /** Enforced at proposal and immediately before signing, including generic payment entry points. */
 export async function assertCreatorReward(db: DB, projectId: string, action: SendPaymentAction, excludeTxId?: string) {

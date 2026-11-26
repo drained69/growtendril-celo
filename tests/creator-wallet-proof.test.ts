@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import type { DB } from "@/server/db/client";
 process.env.PGLITE_DIR = "memory://";
 process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY = "test-client-key";
-process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL = "https://example.test/arc";
-process.env.NEXT_PUBLIC_CIRCLE_MODULAR_CHAIN_ID = "5042";
+process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL = "https://example.test/passkey";
+process.env.NEXT_PUBLIC_CIRCLE_MODULAR_CHAIN_ID = "42220";
 
 let db: DB;
 let s: typeof import("@/server/db/schema");

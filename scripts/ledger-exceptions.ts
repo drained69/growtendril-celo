@@ -1,5 +1,5 @@
 /**
- * Review where the books and Arc disagree: payments into the billing address that matched no
+ * Review where the books and Celo disagree: payments into the billing address that matched no
  * invoice, and wallet payouts that don't match what was approved.
  *
  *   npm run ledger:exceptions                          open items (scan billing first)
@@ -32,7 +32,7 @@ console.log("Billing scan:", scan);
 
 const rows = await exceptionsFor(db, { status: args.includes("--all") ? undefined : "open", limit: 200 });
 if (!rows.length) {
-  console.log("Nothing open. The books match Arc.");
+  console.log("Nothing open. The books match Celo.");
   process.exit(0);
 }
 for (const e of rows) {

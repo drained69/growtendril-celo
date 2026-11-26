@@ -14,8 +14,6 @@ export const CELO = {
 export const IDENTITY_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as const;
 export const CHAINS: Record<string, {label: string; circle: string; explorer: string; caip2: string; rpc: string}> = {
   Celo: {label: CELO.name, circle: "CELO", explorer: CELO.explorer, caip2: CELO.caip2, rpc: CELO.rpcUrl},
-  // Historical explorers only; the policy engine permits Celo mainnet spending alone.
-  Arc: {label: "Arc Mainnet (historical)", circle: "ARC", explorer: "https://explorer.arc.io", caip2: "eip155:5042", rpc: "https://rpc.mainnet.arc.io"},
 };
 export const txExplorerUrl = (chain: string, hash: string) => `${CHAINS[chain]?.explorer ?? CELO.explorer}/tx/${hash}`;
 export const addressExplorerUrl = (chain: string, address: string) => `${CHAINS[chain]?.explorer ?? CELO.explorer}/address/${address}`;

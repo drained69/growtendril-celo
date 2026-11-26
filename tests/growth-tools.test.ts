@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
-import { calculateReward, netPurchases } from "../packages/arc-growth-tools/src/outcomes";
-import { eligiblePurchase, reduceCommerce, type CommerceEvent } from "../packages/arc-growth-tools/src/commerce";
-import { evaluateSpend, executeReservedSpend, reserveSpend, type ReservationStore, type SpendIntent, type SpendPolicy } from "../packages/arc-growth-tools/src/policy";
-import { createReceipt, verifyReceipt, verifyTransfers } from "../packages/arc-growth-tools/src/evidence";
+import { calculateReward, netPurchases } from "../packages/growth-tools/src/outcomes";
+import { eligiblePurchase, reduceCommerce, type CommerceEvent } from "../packages/growth-tools/src/commerce";
+import { evaluateSpend, executeReservedSpend, reserveSpend, type ReservationStore, type SpendIntent, type SpendPolicy } from "../packages/growth-tools/src/policy";
+import { createReceipt, verifyReceipt, verifyTransfers } from "../packages/growth-tools/src/evidence";
 
 const contract = `0x${"1".repeat(40)}`, hash = `0x${"2".repeat(64)}`;
-const event = (operation: CommerceEvent["operation"], amountMicro: number, logIndex: number): CommerceEvent => ({ operation, amountMicro, logIndex, contract, txHash: hash, chainId: 5042002, paymentId: "order1", blockNumber: "10", occurredAt: "2026-10-14T12:00:00Z" });
-const intent: SpendIntent = { id: "reward1", scope: "campaign1", recipient: contract, asset: "USDC", chainId: 5042002, amountMicro: 5, category: "creator", expiresAt: 100 };
-const policy: SpendPolicy = { frozen: false, allowedChains: [5042002], allowedAssets: ["USDC"], allowedRecipients: [contract], allowedCategories: ["creator"], hardLimitMicro: 10, budgetMicro: 10, dailyLimitMicro: 10, approvalAboveMicro: 2, alwaysReviewCategories: ["creator"] };
+const event = (operation: CommerceEvent["operation"], amountMicro: number, logIndex: number): CommerceEvent => ({ operation, amountMicro, logIndex, contract, txHash: hash, chainId: 42220, paymentId: "order1", blockNumber: "10", occurredAt: "2026-10-14T12:00:00Z" });
+const intent: SpendIntent = { id: "reward1", scope: "campaign1", recipient: contract, asset: "USDC", chainId: 42220, amountMicro: 5, category: "creator", expiresAt: 100 };
+const policy: SpendPolicy = { frozen: false, allowedChains: [42220], allowedAssets: ["USDC"], allowedRecipients: [contract], allowedCategories: ["creator"], hardLimitMicro: 10, budgetMicro: 10, dailyLimitMicro: 10, approvalAboveMicro: 2, alwaysReviewCategories: ["creator"] };
 
 /** Deliberately isolated from GrowTendril: implements the public storage adapter. */
 function memoryStore(): ReservationStore {
@@ -22,7 +22,7 @@ function memoryStore(): ReservationStore {
   };
 }
 
-describe("portable Arc growth tools", () => {
+describe("portable growth tools", () => {
   it("caps bonuses and uses integer quality rewards", () => {
     expect(calculateReward({ baseMicro: 10, qualityBonusMicro: 9, outcomeBonusMicro: 2, outcomeCap: 3 }, 75, 9)).toMatchObject({ qualityMicro: 6, outcomeMicro: 6, totalMicro: 22 });
     expect(() => calculateReward({ baseMicro: 10, qualityBonusMicro: 9, outcomeBonusMicro: 2, outcomeCap: 3 }, 101, 0)).toThrow();
@@ -85,8 +85,8 @@ describe("portable Arc growth tools", () => {
     expect(verifyReceipt({ ...receipt, body: { reward: 6 } }, { key1: { issuer: "merchant", publicKey } })).toEqual({ integrity: false, authenticated: false });
   });
   it("does not certify a pending receipt, wrong network or extra outflow", () => {
-    const expected = { chainId: 5042002, asset: "USDC", sender: "sender", recipient: "creator", amountMicro: 5 };
-    const evidence = { status: "confirmed" as const, chainId: 5042002, txHash: hash, transfers: [expected] };
+    const expected = { chainId: 42220, asset: "USDC", sender: "sender", recipient: "creator", amountMicro: 5 };
+    const evidence = { status: "confirmed" as const, chainId: 42220, txHash: hash, transfers: [expected] };
     expect(verifyTransfers(expected, evidence).status).toBe("verified");
     expect(verifyTransfers(expected, { ...evidence, status: "pending" }).status).toBe("pending");
     expect(verifyTransfers(expected, { ...evidence, chainId: 1 }).status).toBe("mismatch");

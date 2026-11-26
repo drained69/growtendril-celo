@@ -8,7 +8,7 @@ import { currentBlock, payoutInTx, transfersFrom } from "@/server/domain/billing
 import { transition } from "@/server/domain/agent/ledger";
 import { confirmCorridor } from "@/server/domain/agent/corridor-payout";
 import { cursorGet, cursorSet, openException } from "@/server/domain/reconcile/exceptions";
-import { verifyTransfers } from "@arc-growth/evidence";
+import { verifyTransfers } from "@growth-tools/evidence";
 
 /**
  * Celo as the independent witness for an agent wallet. A wallet reporting "sent" is not proof; the

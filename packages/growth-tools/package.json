@@ -1,8 +1,8 @@
 {
-  "name": "@growtendril/arc-growth-tools",
+  "name": "@growtendril/growth-tools",
   "version": "0.1.0",
   "type": "module",
-  "description": "Composable outcome rewards, spending controls and Arc payment evidence",
+  "description": "Composable outcome rewards, spending controls and onchain payment evidence",
   "license": "Apache-2.0",
   "files": [
     "dist",

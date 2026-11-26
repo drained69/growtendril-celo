@@ -3,14 +3,13 @@ import { eq, sql } from "drizzle-orm";
 import type { DB } from "@/server/db/client";
 
 process.env.PGLITE_DIR = "memory://";
-const external = vi.hoisted(() => ({ sends: 0, rpcFails: false, noHash: false, incoming: [] as { txHash: string; from: string; amountMicro: number; blockNumber: bigint }[], wallet: {} as Record<string, unknown> }));
+const external = vi.hoisted(() => ({ sends: 0, rpcFails: false, noHash: false, incoming: [] as { txHash: string; from: string; amountMicro: number; blockNumber: bigint }[] }));
 vi.mock("@/server/integrations/email", () => ({ sendEmail: vi.fn(async () => undefined) }));
 vi.mock("@/server/integrations/celo/signer", () => ({ signerFor: () => ({ kind: "test" }) }));
 vi.mock("@/server/integrations/celo/appkit", () => ({ appKitSend: async () => {
   external.sends++;
   return { state: "success", txHash: external.noHash ? null : `0x${external.sends.toString(16).padStart(64, "0")}`, explorerUrl: null, steps: [] };
 } }));
-vi.mock("@/server/integrations/circle/client", () => ({ circleClient: async () => ({ getWallet: async () => ({ data: { wallet: external.wallet } }) }) }));
 vi.mock("@/server/domain/billing/celo", async (original) => ({
   ...await original<typeof import("@/server/domain/billing/celo")>(),
   currentBlock: async () => 1000n,
@@ -146,13 +145,5 @@ describe("financial safety regressions", () => {
     expect(await find()).toMatchObject({ spentMicro: 0, committedMicro: micro(10), conversions: 1 });
     await db.update(s.transactions).set({ state: "SETTLED" }).where(eq(s.transactions.id, tx.id));
     expect((await find()).spentMicro).toBe(micro(10));
-  });
-
-  it("refuses to attach another workspace's Circle wallet", async () => {
-    const wallets = await import("@/server/integrations/circle/wallets");
-    external.wallet = { id: "someone-else", address: ADDRESS, blockchain: "ARC", refId: "p", state: "LIVE", accountType: "EOA" };
-    await expect(wallets.attachCircleWallet(db, { projectId: "p2", userId: "u2", circleWalletId: "someone-else" })).rejects.toThrow(/not assigned/);
-    external.wallet = { ...external.wallet, refId: "p2" };
-    await expect(wallets.attachCircleWallet(db, { projectId: "p2", userId: "u2", circleWalletId: "someone-else" })).rejects.toThrow(/already belongs/);
   });
 });

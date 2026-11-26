@@ -3,7 +3,7 @@ import type { SignableWallet } from "./signer";
 import { signerFor } from "./signer";
 import { agentWalletClient, assertCeloMainnet } from "./client";
 import { CELO, txExplorerUrl } from "./config";
-import { arcUsdcBalanceMicro } from "./wallet-balance";
+import { celoUsdcBalanceMicro } from "./wallet-balance";
 export interface ChainTxResult {state: "pending" | "success" | "error" | "noop"; txHash: string | null; explorerUrl: string | null; steps: {name: string; state: string; txHash?: string; explorerUrl?: string}[]}
 export async function appKitSend(w: SignableWallet, p: {chain: string; to: string; amount: string}): Promise<ChainTxResult> {
   if (!signerFor(w) || p.chain !== "Celo") throw new Error("A Celo mainnet signer is required");
@@ -17,6 +17,6 @@ export async function appKitSend(w: SignableWallet, p: {chain: string; to: strin
 export async function appKitBridge(_w: SignableWallet, _p: {fromChain: string; toChain: string; amount: string}): Promise<ChainTxResult> {throw new Error("Cross-chain spending is disabled");}
 export interface UnifiedBalance {totalMicro: number; byChain: {chain: string; label: string; micro: number}[]; source: "celo_rpc"}
 export async function unifiedBalance(address: string): Promise<UnifiedBalance> {
-  const micro = await arcUsdcBalanceMicro(address);
+  const micro = await celoUsdcBalanceMicro(address);
   return {totalMicro: micro, byChain: [{chain: "Celo", label: CELO.name, micro}], source: "celo_rpc"};
 }

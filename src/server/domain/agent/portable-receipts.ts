@@ -1,5 +1,5 @@
 import { createHash, createPublicKey } from "node:crypto";
-import { createReceipt } from "@arc-growth/evidence";
+import { createReceipt } from "@growth-tools/evidence";
 export function receiptIssuer() {
   const issuer = process.env.APP_URL?.replace(/\/$/, "") || "growtendril-local";
   const privateKey = process.env.CELO_RECEIPT_SIGNING_KEY?.replace(/\\n/g, "\n");

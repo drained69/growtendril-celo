@@ -10,7 +10,7 @@ import { missionSpend, categorySpend, loadPolicy, SPENT_STATES, PENDING_STATES }
 import { proposeFinancialAction } from "@/server/domain/agent/execute";
 import { microToDecimal } from "@/lib/money";
 import { notify } from "@/server/domain/notifications/webhooks";
-import { netPurchases } from "@arc-growth/outcomes";
+import { netPurchases } from "@growth-tools/outcomes";
 
 const ACTIVE = ["proposed", "running", "awaiting_approval"];
 async function locked<T>(db: DB, projectId: string, work: (db: DB) => Promise<T>): Promise<T> {

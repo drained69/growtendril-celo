@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPublicClient, createWalletClient, custom, http, keccak256, parseAbi, toHex, type Address, type EIP1193Provider, type Hex } from "viem";
 import { celo } from "viem/chains";
-import { isOutcomeEscrowCode, OUTCOME_ESCROW_ABI } from "@arc-growth/escrow";
+import { isOutcomeEscrowCode, OUTCOME_ESCROW_ABI } from "@growth-tools/escrow";
 import { Button, Field, Input } from "@/components/ui";
 import { CopyField } from "@/components/ui/copy";
 import { fmtUsdc } from "@/lib/money";

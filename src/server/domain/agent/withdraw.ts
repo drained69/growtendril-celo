@@ -5,7 +5,7 @@ import { audit } from "@/server/db/helpers";
 import { fmtUsdc, microToDecimal, toMicro } from "@/lib/money";
 import { CELO, txExplorerUrl } from "@/server/integrations/celo/config";
 import { getWallet, walletIsLive } from "@/server/integrations/celo/wallets";
-import { arcUsdcBalanceMicro } from "@/server/integrations/celo/wallet-balance";
+import { celoUsdcBalanceMicro } from "@/server/integrations/celo/wallet-balance";
 import { appKitSend } from "@/server/integrations/celo/appkit";
 import { createTransaction, transition } from "@/server/domain/agent/ledger";
 import { recordDecision, updateDecision, writeReceipt } from "@/server/domain/agent/decisions";
@@ -42,7 +42,7 @@ export interface WithdrawableBalance {
 }
 
 /** What the owner can take out now: on-chain balance minus in-flight payments and the fee reserve. */
-export async function withdrawable(db: DB, projectId: string, readBalance = arcUsdcBalanceMicro): Promise<WithdrawableBalance> {
+export async function withdrawable(db: DB, projectId: string, readBalance = celoUsdcBalanceMicro): Promise<WithdrawableBalance> {
   const wallet = await getWallet(db, projectId);
   if (!wallet?.address || !walletIsLive(wallet)) throw new WithdrawError("This workspace has no Celo mainnet wallet that can sign.");
   const balanceMicro = await readBalance(wallet.address);
@@ -55,7 +55,7 @@ export async function withdrawable(db: DB, projectId: string, readBalance = arcU
 }
 
 /** Validates a request and returns the amount in micro-USDC. Shared by "email me a code" and "withdraw". */
-export async function checkWithdrawal(db: DB, projectId: string, input: { amount: string; to: string }, readBalance = arcUsdcBalanceMicro): Promise<{ amountMicro: number; to: string; walletAddress: string }> {
+export async function checkWithdrawal(db: DB, projectId: string, input: { amount: string; to: string }, readBalance = celoUsdcBalanceMicro): Promise<{ amountMicro: number; to: string; walletAddress: string }> {
   const wallet = await getWallet(db, projectId);
   if (!wallet?.address || !walletIsLive(wallet)) throw new WithdrawError("This workspace has no Celo mainnet wallet that can sign.");
   if (wallet.provider === "altana") throw new WithdrawError("You hold this Altana wallet's keys. Withdraw from it directly with your passkey.");
@@ -83,7 +83,7 @@ export const withdrawalScope = (projectId: string, amountMicro: number, to: stri
  * Send USDC from the workspace wallet to `to`. `requestKey` (the consumed email code's id) makes a
  * retried request the same withdrawal instead of a second one.
  */
-export async function withdraw(db: DB, a: { projectId: string; userId: string; amount: string; to: string; requestKey: string }, readBalance = arcUsdcBalanceMicro) {
+export async function withdraw(db: DB, a: { projectId: string; userId: string; amount: string; to: string; requestKey: string }, readBalance = celoUsdcBalanceMicro) {
   // Serialize with agent payments so a payout and a withdrawal can't both spend the same USDC.
   const prepared = await db.transaction(async (trx) => {
     await trx.execute(sql`select pg_advisory_xact_lock(hashtext(${`financial:${a.projectId}`}))`);

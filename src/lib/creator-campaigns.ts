@@ -1,4 +1,4 @@
-import { calculateReward } from "@arc-growth/outcomes";
+import { calculateReward } from "@growth-tools/outcomes";
 import { z } from "zod";
 import { toMicro } from "@/lib/money";
 

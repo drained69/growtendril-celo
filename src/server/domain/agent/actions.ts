@@ -35,7 +35,7 @@ export type ReasonCode = z.infer<typeof ReasonCode>;
 export const BudgetCategory = z.enum(["research", "services", "kol", "bounty", "content", "community", "treasury"]);
 export type BudgetCategory = z.infer<typeof BudgetCategory>;
 
-export const SupportedChain = z.enum(["Celo", "Arc", "Arc_Testnet", "Base_Sepolia", "Arbitrum_Sepolia", "Ethereum_Sepolia"]);
+export const SupportedChain = z.enum(["Celo", "Base_Sepolia", "Arbitrum_Sepolia", "Ethereum_Sepolia"]);
 export type SupportedChain = z.infer<typeof SupportedChain>;
 
 const common = {

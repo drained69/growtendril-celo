@@ -1,5 +1,5 @@
 import { encodeAbiParameters, getAddress, isAddress, keccak256, toHex, type Address, type Hex } from "viem";
-import { isOutcomeEscrowCode, OUTCOME_ESCROW_ABI } from "@arc-growth/escrow";
+import { isOutcomeEscrowCode, OUTCOME_ESCROW_ABI } from "@growth-tools/escrow";
 import { publicClient } from "./client";
 import { CELO } from "./config";
 

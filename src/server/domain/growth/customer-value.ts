@@ -1,4 +1,4 @@
-import { netPurchases } from "@arc-growth/outcomes";
+import { netPurchases } from "@growth-tools/outcomes";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { DB } from "@/server/db/client";
 import * as s from "@/server/db/schema";

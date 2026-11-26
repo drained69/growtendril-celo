@@ -5,7 +5,7 @@ import { newId } from "@/server/lib/ids";
 import { CELO } from "./config";
 import { quote } from "./x402";
 import { safeErrorMessage } from "@/server/security/safe-error";
-export interface DiscoveredService {resourceUrl: string; vendor: string; category: string | null; description: string; method: string; priceMicro: number | null; network: string | null; payableOnArc: boolean}
+export interface DiscoveredService {resourceUrl: string; vendor: string; category: string | null; description: string; method: string; priceMicro: number | null; network: string | null; payableOnCelo: boolean}
 /** Only explicitly configured URLs are requested; prices/recipients come from live Celo 402 quotes. */
 export async function searchMarketplace(query: string, opts: {category?: string; limit?: number} = {}): Promise<DiscoveredService[]> {
   const urls = [...new Set((process.env.CELO_RESEARCH_URLS ?? "").split(",").map(s => s.trim()).filter(Boolean))].slice(0, 30);
@@ -14,7 +14,7 @@ export async function searchMarketplace(query: string, opts: {category?: string;
     const result = await quote(url);
     if (result.kind !== "quote") continue;
     const q = result.quote;
-    out.push({resourceUrl: url, vendor: new URL(url).hostname, category: "research", description: q.description ?? "Paid research on Celo", method: q.method, priceMicro: q.amountMicro, network: CELO.caip2, payableOnArc: true});
+    out.push({resourceUrl: url, vendor: new URL(url).hostname, category: "research", description: q.description ?? "Paid research on Celo", method: q.method, priceMicro: q.amountMicro, network: CELO.caip2, payableOnCelo: true});
   }
   // Caller uses category queries to refresh all configured research services.
   return out.slice(0, opts.limit ?? 20);
@@ -45,14 +45,14 @@ export function inferCapabilities(text: string): string[] {
 }
 
 /** Refresh the catalog from the configured Celo research catalog. Returns how many Celo-payable services were found. */
-export async function refreshMarketplace(db: DB, queries = ["company data", "web search research", "social analytics", "news"]): Promise<{ found: number; arcPayable: number; error?: string }> {
+export async function refreshMarketplace(db: DB, queries = ["company data", "web search research", "social analytics", "news"]): Promise<{ found: number; celoPayable: number; error?: string }> {
   let found = 0;
-  let arcPayable = 0;
+  let celoPayable = 0;
   try {
     for (const q of queries) {
       for (const svc of await searchMarketplace(q, { limit: 15 })) {
         found++;
-        if (svc.payableOnArc) arcPayable++;
+        if (svc.payableOnCelo) celoPayable++;
         await upsertService(db, {
           vendor: svc.vendor,
           vendorSource: "celo_x402",
@@ -67,9 +67,9 @@ export async function refreshMarketplace(db: DB, queries = ["company data", "web
         });
       }
     }
-    return { found, arcPayable };
+    return { found, celoPayable };
   } catch (e) {
-    return { found, arcPayable, error: safeErrorMessage(e) };
+    return { found, celoPayable, error: safeErrorMessage(e) };
   }
 }
 

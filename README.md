@@ -593,7 +593,7 @@ None of these send a real transaction. `celo:e2e` and `--rehearse` need `anvil` 
 
 | Suite | Coverage |
 |---|---|
-| Application tests | 411 tests in 44 files: payments, policy, receipts, x402, Textile FX, Self, Altana, billing, authentication, security boundaries and the growth domain |
+| Application tests | 417 tests in 45 files: payments, policy, receipts, x402, Textile FX, Self, Altana, billing, authentication, security boundaries and the growth domain |
 | Contract tests | 52 Foundry tests, including 11 invariant tests |
 | Invariant fuzzing | 11 safety rules, each checked across 512,000 random actions with the agent's key treated as stolen |
 | Forked-USDC test | The escrow against the real Celo USDC contract |

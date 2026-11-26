@@ -46,7 +46,7 @@ export const NAV: { section: string | null; items: NavItem[] }[] = [
     items: [
       { href: "/app/wallet", label: "Wallet", icon: Wallet, keywords: "balance gateway usdc deposit" },
       { href: "/app/approvals", label: "Approvals", icon: ShieldCheck, badge: "approvals", keywords: "inbox spend" },
-      { href: "/app/activity", label: "Celo / Circle activity", icon: Activity, keywords: "transactions x402 settlements receipts", secondary: true },
+      { href: "/app/activity", label: "Onchain activity", icon: Activity, keywords: "transactions x402 settlements receipts", secondary: true },
       { href: "/app/receipts", label: "Receipts", icon: Receipt, keywords: "decisions audit hash", secondary: true },
       { href: "/app/runs", label: "Agent runs", icon: Bot, keywords: "jobs autopilot logs", secondary: true },
     ],

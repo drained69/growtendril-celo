@@ -128,7 +128,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
                 title="Product intelligence profile"
                 description="Correct anything that's wrong — this drives what GrowTendril searches for."
                 icon={<FileText />}
-                action={<Badge>{profile.generatedBy}</Badge>}
+                action={<Badge>{["claude", "gemini"].includes(profile.generatedBy) ? "AI draft" : "From your pages"}</Badge>}
               />
               <div className="border-b border-line px-4 py-2.5 text-[11.5px] text-ink-3">
                 <span className="label mr-2">Read from</span>
@@ -160,7 +160,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
           <div className="space-y-4">
             {icps.length > 0 && (
               <Card>
-                <CardHeader title="Proposed ideal customer profile" description="Edit freely — the operator qualifies companies against these." icon={<Target />} />
+                <CardHeader title="Proposed ideal customer profile" description="Edit freely — the agent qualifies companies against these." icon={<Target />} />
                 <IcpForm icps={icps} disabled={!canEdit} />
               </Card>
             )}
@@ -173,7 +173,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
 
         {step === 4 && (
           <Card>
-            <CardHeader title="Autonomy: the hard rules" description="Enforced by a deterministic policy engine on every structured action — not by a prompt." icon={<ShieldCheck />} />
+            <CardHeader title="Autonomy: the hard rules" description="Checked by a fixed rules engine on every action, not by a prompt, and enforced again by your workspace contract on Celo." icon={<ShieldCheck />} />
             {canPolicy ? <AutonomyStep autopilot={AUTOPILOT_LABEL} billing={billingMode() !== "off"} /> : <CardFooter>Only owners and admins can activate the workspace.</CardFooter>}
           </Card>
         )}

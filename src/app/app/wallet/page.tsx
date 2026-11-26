@@ -37,25 +37,37 @@ export default async function WalletPage() {
   const live = walletIsLive(wallet);
   const summary = mission ? await missionSummary(db, mission) : null;
   const owner = can(role, "manage_workspace");
-  const withdrawal = owner && live && wallet?.provider !== "altana" ? await withdrawable(db, project.id).catch(() => null) : null;
+  // A workspace contract withdraws from its own panel, signed by the owner's wallet.
+  const withdrawal = owner && live && wallet?.provider !== "altana" && wallet?.provider !== "growth_vault" ? await withdrawable(db, project.id).catch(() => null) : null;
   const session = await openSession(db, project.id);
   const protocol = await loadProtocolView(db, project, wallet, policy ? await loadPolicy(db, project.id) : null, mission ?? null).catch(() => null);
-  const issue = custodyProblem();
+  const operatorWorkspace = process.env.CELO_AGENT_PROJECT_ID === project.id;
+  // Server-wallet setup concerns only the operator's own workspace; customers never see it.
+  const issue = operatorWorkspace ? custodyProblem() : null;
+  const contract = wallet?.provider === "growth_vault";
+  const contractFunds = contract ? protocol?.funds ?? [] : [];
+  const usdcHeld = contract ? contractFunds.find((f) => f.token === "USDC")?.balance : balances.walletMicro;
+  const usdtHeld = contractFunds.find((f) => f.token === "USD₮")?.balance;
+  const showServerWallet = !!wallet?.address && !contract ? true : !wallet && !protocol && operatorWorkspace;
   return <div className="space-y-4">
-    <PageHeader title="Wallet" description="Fund growth work with USDC on Celo. Creator payments require approval; research purchases follow your spending limits."
+    <PageHeader title="Wallet" description="Fund growth work with USDC on Celo. Payments to people always need your approval; research purchases follow your spending limits."
       meta={<span>{CELO.name} · chain {CELO.chainId}</span>}
       actions={<ActionButton action={refreshSettlementsAction} label="Refresh settlements" icon={<RefreshCw />} />} />
     <StatStrip className="grid-cols-2 lg:grid-cols-4">
-      <Stat label="Wallet USDC" value={balances.walletMicro == null ? "—" : fmtUsdc(balances.walletMicro)} sub={wallet ? "Celo ERC-20 balance" : "No wallet attached"} />
+      <Stat label={contract ? "Contract USDC" : "Wallet USDC"} value={usdcHeld == null ? "—" : fmtUsdc(Number(usdcHeld))} sub={contract ? `${usdtHeld ? fmtUsdc(Number(usdtHeld)).replace("USDC", "USD₮") : "0 USD₮"} for local payouts` : wallet ? "Celo balance" : "No wallet yet"} />
       <Stat label="Spent today" value={fmtUsdc(spent)} sub={`Daily limit ${fmtUsdc(policy?.dailySpendMicro ?? 0)}`} />
-      <Stat label="Per-payment limit" value={policy ? fmtUsdc(effectivePaymentCeiling(policy)) : "—"} sub="Managed in Settings" />
+      <Stat label="Per-payment limit" value={policy ? fmtUsdc(effectivePaymentCeiling(policy)) : "—"} sub={<Link className="underline" href="/app/settings">Change in Settings</Link>} />
       <Stat label="Mission remaining" value={mission && summary ? fmtUsdc(mission.budgetMicro - summary.spent) : "—"} sub="After committed spend" />
     </StatStrip>
-    {issue && <Callout tone="warn" title="Wallet setup incomplete">{issue}</Callout>}
+    {issue && <Callout tone="warn" title="Agent wallet setup incomplete">{issue}</Callout>}
     {!!balances.errors.length && <Callout tone="warn" title="Balance unavailable">{balances.errors.join(" · ")}</Callout>}
-    {wallet?.frozen && <Callout tone="danger" title="Spending is frozen" action={manage ? <ActionButton action={toggleFreezeAction} label="Resume spending" icon={<Unlock />} /> : undefined}>Every spend is denied until a wallet manager resumes it.</Callout>}
+    {wallet?.frozen && <Callout tone="danger" title="Spending is frozen" action={manage && !contract ? <ActionButton action={toggleFreezeAction} label="Resume spending" icon={<Unlock />} /> : undefined}>{contract ? "Every payment is refused until you resume spending in your workspace contract below." : "Every spend is denied until a wallet manager resumes it."}</Callout>}
     <LedgerExceptions items={exceptions} canResolve={manage} />
-    <Card><CardHeader title="Workspace wallet" description={live ? "Celo wallet ready for approved payments" : "Attach a dedicated wallet to this workspace"} icon={<WalletIcon />} />
+    {!wallet && protocol && <Callout tone="info" title="Choose how this workspace pays">Most teams use a workspace contract: your own wallet owns it, and the agent can only act inside your rules. You can instead keep funds in an Altana passkey wallet. A workspace keeps the first wallet you link.</Callout>}
+    {protocol && (!wallet || contract) && <Card><CardHeader title="Your workspace contract" description="Your budget, limits, approvals and payouts, enforced on Celo mainnet" icon={<Landmark />} />
+      <CardBody><WorkspaceContract view={protocol} canManage={manage} /></CardBody>
+    </Card>}
+    {showServerWallet && <Card><CardHeader title="Workspace wallet" description={live ? "Celo wallet ready for approved payments" : "Attach a dedicated wallet to this workspace"} icon={<WalletIcon />} />
       <CardBody className="space-y-4">
         {wallet?.address ? <>
           <CopyField value={wallet.address} />
@@ -67,16 +79,12 @@ export default async function WalletPage() {
           ]} />
           {manage && !wallet.frozen && <ActionButton action={toggleFreezeAction} label="Freeze spending" icon={<ShieldCheck />} />}
         </> : <>
-          <p className="text-sm text-ink-3">Create an Altana wallet below to keep custody yourself. Operators can instead bind a dedicated server wallet to this workspace.</p>
-          <p className="text-sm text-ink-3">Workspace ID for operator setup: <code className="num break-all">{project.id}</code></p>
-          {manage && process.env.CELO_AGENT_PROJECT_ID === project.id && <ActionButton action={provisionWalletAction} label="Attach configured Celo wallet" icon={<WalletIcon />} />}
+          <p className="text-sm text-ink-3">Attach the agent wallet configured on this server to this workspace.</p>
+          {manage && <ActionButton action={provisionWalletAction} label="Attach configured Celo wallet" icon={<WalletIcon />} />}
         </>}
       </CardBody>
-    </Card>
-    {protocol && (!wallet || wallet.provider === "growth_vault") && <Card><CardHeader title="Your workspace contract" description="Your budget, limits, approvals and payouts, enforced on Celo mainnet" icon={<Landmark />} />
-      <CardBody><WorkspaceContract view={protocol} canManage={manage} /></CardBody>
     </Card>}
-    {(!wallet || wallet.provider === "altana") && <Card><CardHeader title="Your Altana wallet" description="You keep custody. Celo enforces the agent's spend cap, allowed contracts and expiry." icon={<KeyRound />} />
+    {(!wallet || wallet.provider === "altana") && <Card><CardHeader title={wallet ? "Your Altana wallet" : "Or use an Altana passkey wallet"} description="You keep custody. Celo enforces the agent's spend cap, allowed contracts and expiry." icon={<KeyRound />} />
       <CardBody><AltanaWallet address={wallet?.address ?? null} canManage={manage} workspaceName={project.name} session={session ? {id: session.id, publicKey: session.publicKey, capUsd: fmtUsdc(session.capMicro), period: session.period, expiresAt: session.expiresAt.toISOString(), grantTxHash: session.grantTxHash, revokeTxHash: session.revokeTxHash} : null} /></CardBody>
     </Card>}
     <Card><CardHeader title="Pay creators in their currency" description="Textile FX converts USD₮ to a local stablecoin, then the agent delivers it" icon={<Globe2 />} />
@@ -88,12 +96,13 @@ export default async function WalletPage() {
     <Card><CardHeader title="Verified payments" description="Paid research with proof that a real person stands behind an agent" icon={<ShieldCheck />} />
       <CardBody className="space-y-3 text-sm text-ink-3">
         <p>GrowTendril’s research service requires Self Agent ID before it offers a paid request, and limits use per person across their agents. Payments use Celo’s x402 facilitator. Each purchase retains its source evidence and is reconciled against the USDC transfer.</p>
-        <p>Self request signing is {process.env.SELF_AGENT_ENABLED === "1" ? "enabled" : "awaiting operator setup"}. ERC-8004 identity: {process.env.CELO_AGENT_ID || "awaiting registration"}.</p>
+        <p>Agent identity: {process.env.CELO_AGENT_ID ? <>ERC-8004 agent #{process.env.CELO_AGENT_ID} on Celo</> : "not registered yet"}. Self verification: {process.env.SELF_AGENT_ENABLED === "1" ? "active" : "not active yet"}.</p>
         <p>Prepaid scan credit is separate from wallet funds. <Link className="underline" href="/billing">Manage Billing</Link></p>
       </CardBody>
     </Card>
     {withdrawal && <Card><CardHeader title="Withdraw USDC" description="Owner only; confirmed with an emailed code and an onchain receipt" />
       <CardBody><p className="mb-4 text-sm text-ink-3">Available: {fmtUsdc(withdrawal.availableMicro)} after committed payments. Network gas uses CELO separately.</p><WithdrawForm availableUsdc={String(withdrawal.availableMicro / 1e6)} explorer={CELO.explorer} /></CardBody>
     </Card>}
+    {owner && <p className="text-[11.5px] text-ink-4">Workspace ID <code className="num break-all">{project.id}</code></p>}
   </div>;
 }

@@ -42,7 +42,7 @@ export default async function Landing() {
           </header>
 
           <div className="relative z-10 mx-auto max-w-[1240px] px-5 pt-14 text-center sm:px-8 sm:pt-20">
-            <div className="text-[14px] text-ink/55" style={{ animation: "rise-in 600ms cubic-bezier(0.2,0.75,0.2,1) both" }}>For shops, apps, services and software · now on Celo</div>
+            <div className="text-[14px] text-ink/55" style={{ animation: "rise-in 600ms cubic-bezier(0.2,0.75,0.2,1) both" }}>For shops, apps, services and software · Powered by Celo</div>
             <h1 className="display display-bounce mx-auto mt-5 text-[clamp(2.2rem,4.3vw,3.6rem)] leading-[1.1] text-ink" style={{ animation: "rise-in 700ms 80ms cubic-bezier(0.2,0.75,0.2,1) both" }}>
               Find your next customers.
               <br />

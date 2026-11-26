@@ -36,7 +36,8 @@ export async function updatePolicyAction(_: unknown, form: FormData): Promise<Ac
       return nextVersion;
     });
     revalidatePath("/app", "layout");
-    return { ok: true, message: `Policy saved (v${version})` };
+    const [contract] = await db.select({ id: s.wallets.id }).from(s.wallets).where(and(eq(s.wallets.projectId, project.id), eq(s.wallets.provider, "growth_vault")));
+    return { ok: true, message: contract ? `Rules saved (v${version}). Publish them on the Wallet page so your workspace contract enforces them.` : `Policy saved (v${version})` };
   } catch (e) {
     return fail(e);
   }

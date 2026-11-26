@@ -24,8 +24,9 @@ import { RecipientForm } from "@/components/features/experiments/recipient-form"
 import { DeliveryForm } from "@/components/features/experiments/delivery-form";
 import { ProposalForm } from "@/components/features/experiments/proposal-form";
 import { appOrigin } from "@/server/lib/origin";
+import { RAIL_LABEL } from "@/lib/rails";
 
-const RAIL: Record<string, string> = { growth_vault: "Workspace contract", textile_corridor: "Textile FX corridor", celo_x402: "x402 · Celo", celo_usdc_send: "Celo wallet Send", app_kit_bridge: "Celo wallet Bridge", gateway_deposit: "Gateway deposit (historical)" };
+const RAIL = RAIL_LABEL;
 
 export default async function Experiment({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

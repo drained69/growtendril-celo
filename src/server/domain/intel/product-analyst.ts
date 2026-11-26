@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { aiName, aiStructured } from "@/server/integrations/llm";
+import { aiStructured } from "@/server/integrations/llm";
 import { readPage, readGithubReadme, type PageText } from "@/server/domain/intel/crawl";
 import { AUDIENCES, audienceUsers, detectAudience, heuristicKeywords, pickCategory, siteTerms, targetUsersFrom, type Audience } from "@/server/domain/intel/market-taxonomy";
 
@@ -130,7 +130,7 @@ export async function analyzeProduct(input: ProductInput, opts: { pages?: PageTe
     effort: "medium",
   });
   if (ai.data) {
-    return { profile: { ...ai.data, audience: input.audience ?? ai.data.audience }, generatedBy: "claude", crawled, note: `Profile drafted by ${aiName()} from ${readable.length} public source(s). Review and correct anything wrong.` };
+    return { profile: { ...ai.data, audience: input.audience ?? ai.data.audience }, generatedBy: "claude", crawled, note: `Profile drafted from ${readable.length} public source(s). Review and correct anything wrong.` };
   }
   return {
     profile: heuristicProfile(input, readable),
@@ -181,6 +181,6 @@ export async function proposeIcp(profile: ProductProfile, productName: string): 
     user: `PRODUCT: ${productName}\nPROFILE:\n${JSON.stringify(profile, null, 2)}`,
     effort: "low",
   });
-  if (ai.data) return { icps: ai.data.icps, generatedBy: "claude", note: `ICP drafted by ${aiName()}. Edit freely.` };
+  if (ai.data) return { icps: ai.data.icps, generatedBy: "claude", note: "Ideal customer profiles drafted. Edit freely." };
   return { icps: heuristicIcp(profile), generatedBy: "heuristic", note: `${ai.error ?? "AI unavailable"} — ICP generated from category templates.` };
 }

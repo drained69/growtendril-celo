@@ -6,7 +6,7 @@ import { missionPerformance, missionProgress } from "@/server/domain/growth/attr
 import { cpa, evaluateExperiments, growthEfficiency } from "@/server/domain/growth/learning";
 import { DAY_MS } from "@/lib/time";
 
-export const CATEGORY_LABEL: Record<string, string> = { research: "Research", services: "Services", kol: "KOLs", bounty: "Bounties", content: "Content", community: "Community", treasury: "Treasury" };
+export const CATEGORY_LABEL: Record<string, string> = { research: "Research", services: "Services", kol: "Creators", bounty: "Bounties", content: "Content", community: "Community", treasury: "Treasury" };
 
 /** Budget + progress numbers for a mission, computed from the ledger and attribution only. */
 export async function missionSummary(db: DB, mission: typeof s.missions.$inferSelect) {

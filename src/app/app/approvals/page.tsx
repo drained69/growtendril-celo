@@ -61,7 +61,7 @@ export default async function Approvals() {
     <div className="space-y-4">
       <PageHeader
         title="Approvals"
-        description="Spend the policy engine will not allow autonomously. Approving waives approval-level rules for this one decision; deny rules (hard ceiling, mission budget, chains, kill switch) are re-checked and still apply."
+        description="Payments that need your decision. Approving lets this one payment through; your per-payment ceiling, mission budget and freeze still apply. With a workspace contract, you sign each approval in your own wallet."
         meta={
           <>
             <ModeBadge mode={project.dataMode} />

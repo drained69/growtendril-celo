@@ -8,7 +8,7 @@ import { analyzeProject, type Logger, type AnalysisStats } from "@/server/domain
 import { daysAgo } from "@/lib/time";
 import { enrichCreators, scoutCreators } from "@/server/domain/growth/creator-scout";
 import { buildCreatorReport, latestCreatorReport, saveCreatorReport } from "@/server/domain/growth/creator-report";
-import { aiEnabled, aiName } from "@/server/integrations/llm";
+import { aiEnabled } from "@/server/integrations/llm";
 import type { Audience } from "@/server/domain/intel/market-taxonomy";
 import { safeErrorMessage } from "@/server/security/safe-error";
 
@@ -76,7 +76,7 @@ export async function refreshCreatorReport(db: DB, projectId: string, log: Logge
   try {
     const prev = await latestCreatorReport(db, projectId);
     const aiDue = aiEnabled() && (opts.forceAi || !prev || prev.generatedBy !== "claude" || Date.now() - new Date(prev.generatedAt).getTime() > 86_400_000);
-    const report = await buildCreatorReport(db, projectId, { ai: aiDue, onAiError: (m) => log("kol", `${aiName()} didn't write the report text, so it keeps the standard wording: ${m}`) });
+    const report = await buildCreatorReport(db, projectId, { ai: aiDue, onAiError: (m) => log("kol", `The AI didn't write the report text, so it keeps the standard wording: ${m}`) });
     if (!report.entries.length) return null;
     // Keep yesterday's AI prose when today's rebuild is template-only and nothing new was written.
     if (!aiDue && prev?.generatedBy === "claude") {

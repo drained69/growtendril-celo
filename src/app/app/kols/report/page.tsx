@@ -191,7 +191,7 @@ export default async function InfluencerReport() {
         ]}
         title="Influencer report"
         description={`The creators most worth contacting for ${project.name}: why they fit, what they post about, how to reach them, and a first message you can send yourself.`}
-        meta={report ? <span>Updated {relTime(report.generatedAt)} · {report.generatedBy === "claude" ? "analysis written by AI" : "analysis from templates"}</span> : undefined}
+        meta={report ? <span>Updated {relTime(report.generatedAt)} · {["claude", "gemini"].includes(report.generatedBy) ? "analysis written by AI" : "analysis from templates"}</span> : undefined}
         actions={
           <>
             {report && (

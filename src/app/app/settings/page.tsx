@@ -107,7 +107,7 @@ export default async function Settings() {
               action={
                 profile && (
                   <>
-                    <Badge>{profile.generatedBy}</Badge>
+                    <Badge>{["claude", "gemini"].includes(profile.generatedBy) ? "AI draft" : "From your pages"}</Badge>
                     {profile.founderEdited && <Badge tone="info">edited</Badge>}
                   </>
                 )
@@ -139,7 +139,7 @@ export default async function Settings() {
           </Card>
 
           <Card id="icp" className="scroll-mt-4">
-            <CardHeader title="Ideal customer profile" description="Who the operator qualifies companies against." icon={<Target />} />
+            <CardHeader title="Ideal customer profile" description="Who the agent qualifies companies against." icon={<Target />} />
             {icps.length ? (
               <IcpForm icps={icps} disabled={!canWorkspace} />
             ) : (
@@ -150,7 +150,7 @@ export default async function Settings() {
           <Card id="policy" className="scroll-mt-4">
             <CardHeader
               title="Spend policy"
-              description="Enforced in code by a deterministic policy engine on every structured action — not in a prompt."
+              description="Checked by a fixed rules engine on every action, not by a prompt. Publish changes on the Wallet page so your workspace contract enforces them too."
               icon={<ShieldCheck />}
               action={
                 policy && (
@@ -183,7 +183,7 @@ export default async function Settings() {
           <Card id="autopilot" className="scroll-mt-4">
             <CardHeader
               title="Autopilot"
-              description="How often the operator runs a full cycle on its own. Every action still passes the spend policy."
+              description="How often the agent runs a full cycle on its own. Every action still passes your spending rules."
               icon={<Bot />}
               action={<Badge tone={project.autopilot === "off" ? "muted" : "good"} dot={project.autopilot !== "off"}>{AUTOPILOT_LABEL[project.autopilot] ?? project.autopilot}</Badge>}
             />

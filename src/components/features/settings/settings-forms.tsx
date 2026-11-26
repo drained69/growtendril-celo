@@ -184,7 +184,7 @@ export function PolicyForm({ p, disabled }: { p: Policy; disabled?: boolean }) {
             <Input id="pol-hardCeiling" name="hardCeiling" type="number" min="0.000001" step="0.000001" defaultValue={p.hardCeiling} inputMode="decimal" />
           </Field>
         </div>
-        <div className="rounded-[8px] border border-line p-3 text-[12px] text-ink-3">Celo mainnet · {p.tokens.join(", ") || "USDC"} only · no cross-chain transfers. Forbidden actions: {p.forbidden.map((f) => f.replace(/_/g, " ")).join(", ")}.</div>
+        <div className="rounded-[8px] border border-line p-3 text-[12px] text-ink-3">Celo mainnet · {p.tokens.join(", ") || "USDC"} only · no cross-chain transfers. Never allowed: {p.forbidden.map((f) => ({ mass_unsolicited_messaging: "mass unsolicited messages", automated_dm: "automated DMs", automated_cold_email: "automated cold email", automated_mentions: "automated mentions" } as Record<string, string>)[f] ?? f.replace(/_/g, " ")).join(", ")}.</div>
       </fieldset>
       <FormFooter pending={pending} label="Save policy" disabled={disabled} state={state} note="Changes are versioned and audit-logged." />
     </form>
@@ -194,7 +194,7 @@ export function PolicyForm({ p, disabled }: { p: Policy; disabled?: boolean }) {
 // ───────────────────────────── autopilot ─────────────────────────────
 
 const CADENCE_HELP: Record<string, string> = {
-  off: "The operator only runs when someone clicks Run cycle.",
+  off: "The agent only runs when someone clicks Run agent.",
   hourly: "May scan as soon as credit is available, then every hour.",
   every_6h: "May scan as soon as credit is available, then every six hours.",
   daily: "May scan as soon as credit is available, then once a day.",

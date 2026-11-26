@@ -9,6 +9,7 @@ import { fmtUsdc } from "@/lib/money";
 import { Badge, Callout, Card, CardBody, CardHeader, ExternalLink, KeyValue, LinkButton, ModeBadge, PageHeader, StatusBadge, TxStateBadge, VerdictBadge, shortHash } from "@/components/ui";
 import { CopyField } from "@/components/ui/copy";
 import { writeReceipt } from "@/server/domain/agent/decisions";
+import { RAIL_LABEL } from "@/lib/rails";
 
 type Body = {
   decision: number;
@@ -29,7 +30,7 @@ type Body = {
   createdAt: string;
 };
 
-const RAIL: Record<string, string> = { growth_vault: "Workspace contract", textile_corridor: "Textile FX corridor", celo_x402: "Celo x402", celo_usdc_send: "Celo wallet · Send", app_kit_bridge: "Celo wallet · Bridge", gateway_deposit: "Gateway deposit (historical)" };
+const RAIL = RAIL_LABEL;
 const humanize = (k: string) => k.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 const NETWORK_KEY: Record<string, string> = { "Celo Mainnet": "Celo", "Celo Testnet": "Arc_Testnet", "Base Sepolia": "Base_Sepolia", "Arbitrum Sepolia": "Arbitrum_Sepolia", "Ethereum Sepolia": "Ethereum_Sepolia" };
 
@@ -165,7 +166,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
                     { k: "Rail", v: RAIL[p.rail] ?? p.rail },
                     { k: "Network", v: `${p.network}${p.destination ? ` → ${p.destination}` : ""}` },
                     { k: "Settlement ID", v: p.settlementId ? <span className="num text-[11.5px]" title={p.settlementId}>{shortHash(p.settlementId, 6)}</span> : "—" },
-                    { k: "Gateway status", v: p.settlementStatus ?? "—" },
+                    { k: "Settlement status", v: p.settlementStatus ?? "—" },
                     { k: "Tx hash", v: p.txHash && txUrl ? <ExternalLink href={txUrl} className="num text-[11.5px]">{shortHash(p.txHash)}</ExternalLink> : "—" },
                     { k: "Celo batch tx", v: p.batchTxHash ? <ExternalLink href={txExplorerUrl(chainKey, p.batchTxHash)} className="num text-[11.5px]">{shortHash(p.batchTxHash)}</ExternalLink> : "—" },
                     ...(p.responseDigest ? [{ k: "Response sha256", v: <span className="num text-[11px]" title={p.responseDigest}>{shortHash(p.responseDigest, 8)}</span> }] : []),
@@ -192,7 +193,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
                 )}
                 {status === "SIMULATED" && (
                   <Callout tone="warn" title="Simulated">
-                    No wallet was configured, so no funds moved and there is no settlement ID or hash. Set up the workspace wallet to run this for real.
+                    No wallet was configured, so no funds moved and there is no settlement ID or hash. Set up your workspace contract on the Wallet page to run this for real.
                   </Callout>
                 )}
               </CardBody>

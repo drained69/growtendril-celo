@@ -1,8 +1,14 @@
-import { Banknote, BadgeCheck, KeyRound } from "lucide-react";
+import { Banknote, BadgeCheck, KeyRound, Landmark } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
 import { Eyebrow, Headline, Lede, Section } from "@/components/marketing/primitives";
 
 const RAILS = [
+  {
+    icon: Landmark,
+    title: "A contract you own",
+    body: "Your budget and spending rules live in your own workspace contract. The agent can propose payments, but only your wallet approves a payment to a person, and you can freeze or withdraw at any time.",
+    detail: "Owner-controlled · enforced onchain",
+  },
   {
     icon: Banknote,
     title: "Pay creators in their own currency",
@@ -11,8 +17,8 @@ const RAILS = [
   },
   {
     icon: KeyRound,
-    title: "Limits the chain enforces",
-    body: "Keep your wallet with an Altana passkey. The agent gets a key with a spend cap, approved contracts and an expiry, and one transaction revokes it.",
+    title: "Or keep custody with a passkey",
+    body: "Prefer a wallet? Keep funds in an Altana passkey wallet. The agent gets a key with a spend cap, approved contracts and an expiry, and one transaction revokes it.",
     detail: "Non-custodial · revocable onchain",
   },
   {
@@ -34,9 +40,9 @@ export function OnCelo() {
             <br />
             people where they live.
           </Headline>
-          <Lede>Creators should get paid in money they can spend, and your agent should never hold your keys. GrowTendril is built for both on Celo mainnet, and checks each payment against the chain.</Lede>
+          <Lede>Creators should get paid in money they can spend, and your agent should never hold your money. GrowTendril keeps your budget in a contract you own on Celo mainnet, and checks each payment against the chain.</Lede>
         </Reveal>
-        <div className="mt-12 grid gap-5 md:grid-cols-3">
+        <div className="mt-12 grid gap-5 md:grid-cols-2">
           {RAILS.map(({ icon: Icon, title, body, detail }, i) => (
             <Reveal key={title} delay={i * 80} className="window flex flex-col p-6">
               <Icon className="size-5 text-accent" aria-hidden />

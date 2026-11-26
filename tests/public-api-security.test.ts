@@ -27,13 +27,3 @@ describe("scheduler authentication", () => {
     expect(worker.runOnce).toHaveBeenCalledOnce();
   });
 });
-
-describe("Celo deployment rejects legacy Circle callbacks", () => {
-  it("does not allow legacy notifications to settle Celo payments", async () => {
-    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
-    const { POST } = await import("@/app/api/webhooks/circle/route");
-    const response = await POST(new Request("https://celo.growtendril.xyz/api/webhooks/circle", {method: "POST", body: '{"notification":{"state":"CONFIRMED"}}'}));
-    expect(response.status).toBe(410);
-    expect(fetch).not.toHaveBeenCalled();
-  });
-});

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
-import { BaseError, ContractFunctionRevertedError, getAddress, isAddress, keccak256, toHex, zeroAddress, type Abi, type Address, type Hash, type Hex } from "viem";
+import { BaseError, ContractFunctionRevertedError, erc20Abi, getAddress, isAddress, keccak256, toHex, zeroAddress, type Abi, type Address, type Hash, type Hex } from "viem";
 import { toDataSuffix } from "@celo/attribution-tags";
 import { canonical } from "@arc-growth/evidence";
 import type { DB } from "@/server/db/client";
@@ -43,11 +43,26 @@ export function onchainPolicy(p: {autonomyEnabled?: boolean; maxTransactionMicro
   return {autonomyEnabled: p.autonomyEnabled === true, maxTransaction: BigInt(p.maxTransactionMicro), dailySpend: BigInt(p.dailySpendMicro), hardCeiling: BigInt(p.hardCeilingMicro), autonomousCategories: mask(p.autonomousCategories), approvalCategories: mask(p.approvalCategories)};
 }
 
+/** What the owner can do about each refusal, in their terms rather than the contract's. */
+const REFUSAL_HELP: Record<string, string> = {
+  "hard ceiling": "This payment is above the per-payment ceiling in your workspace contract. Raise it in Settings, then publish the new rules on the Wallet page.",
+  "category not allowed": "Your workspace contract does not allow this kind of spending yet. Publish your current spending rules on the Wallet page.",
+  "mission inactive": "Your mission is not active in the workspace contract. Publish the current mission on the Wallet page.",
+  "mission budget": "This would go over the mission budget in your workspace contract. Start a mission with a larger budget, then publish it on the Wallet page.",
+  "experiment budget": "This would go over the experiment's budget. Increase the experiment budget or reduce the payment.",
+  "experiment inactive": "This experiment has been stopped in your workspace contract.",
+  "frozen": "Spending is frozen in your workspace contract. Resume it on the Wallet page.",
+  "not authorized": "GrowTendril's agent is not allowed to act on your workspace contract. Restore the agent on the Wallet page.",
+  "payee hold": "You added this recipient yourself less than 24 hours ago, so someone else must approve it or you can approve after the hold.",
+  "transfer failed": "The workspace contract does not hold enough funds for this payment. Deposit more on the Wallet page.",
+};
+
 /** Contract reverts are the protocol's policy decisions, so their short reason is safe and useful to show. */
 function refused(error: unknown): Error {
   if (error instanceof BaseError) {
     const revert = error.walk((e) => e instanceof ContractFunctionRevertedError);
     const reason = revert instanceof ContractFunctionRevertedError ? revert.reason : null;
+    if (reason && REFUSAL_HELP[reason]) return new Error(REFUSAL_HELP[reason]);
     if (reason && /^[a-z ]{3,48}$/i.test(reason)) return new Error(`The workspace contract refused this: ${reason}.`);
   }
   return new Error("The workspace contract could not be reached. Nothing was sent.");
@@ -85,7 +100,12 @@ export async function verifyWorkspace(projectId: string, address: string) {
   if (!isAddress(address)) throw new Error("The workspace address is invalid");
   const workspace = getAddress(address);
   const client = publicClient();
-  const isWorkspace = await client.readContract({address: protocol.factory, abi: GROWTH_FACTORY_ABI, functionName: "isWorkspace", args: [workspace]});
+  // The browser confirms creation on one RPC node; the next read can reach a node that is a block behind.
+  let isWorkspace = false;
+  for (let attempt = 0; attempt < 6 && !isWorkspace; attempt++) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 2_000));
+    isWorkspace = await client.readContract({address: protocol.factory, abi: GROWTH_FACTORY_ABI, functionName: "isWorkspace", args: [workspace]});
+  }
   if (!isWorkspace) throw new Error("This address was not created by the GrowTendril factory");
   const [ref, operatorOk] = await Promise.all([readWorkspace<Hex>(workspace, "ref"), readWorkspace<boolean>(workspace, "hasRole", [operatorAccount().address, ROLE_OPERATOR])]);
   if (ref !== workspaceRef(projectId)) throw new Error("This contract belongs to a different workspace");
@@ -311,6 +331,8 @@ export interface ProtocolView {
   policy: {autonomyEnabled: boolean; maxTransaction: string; dailySpend: string; hardCeiling: string; autonomousCategories: number; approvalCategories: number};
   policyInSync: boolean; owner: Address | null; frozen: boolean; operatorActive: boolean; checkpoints: number;
   mission: {id: Hex; name: string; budget: string; endsAt: string; goalHash: Hex; categories: number[]; budgets: string[]; published: boolean} | null;
+  /** Token balances held by the contract, in micro-units, and the part reserved for open payments. */
+  funds: {token: "USDC" | "USD₮"; address: Address; balance: string; reserved: string}[];
 }
 export async function loadProtocolView(db: DB, project: {id: string}, wallet: {provider: string; address: string | null} | null, policyRow: Parameters<typeof onchainPolicy>[0] | null, mission: typeof s.missions.$inferSelect | null): Promise<ProtocolView | null> {
   const protocol = protocolAddresses();
@@ -320,24 +342,30 @@ export async function loadProtocolView(db: DB, project: {id: string}, wallet: {p
   const workspace = wallet?.provider === "growth_vault" && wallet.address ? wallet.address as Address : null;
   const operator = operatorProblem() ? null : operatorAccount().address;
   let policyInSync = false, owner: Address | null = null, frozen = false, operatorActive = false, published = false, checkpoints = 0;
+  let funds: ProtocolView["funds"] = [];
   if (workspace) {
     const missionId = mission ? protocolId("mission", mission.id) : null;
-    const [current, currentOwner, isFrozen, onchainMission, count, operatorRoles] = await Promise.all([
+    const tokens = [{token: "USDC" as const, address: CELO.usdc as Address}, {token: "USD₮" as const, address: USDT.address}];
+    const [current, currentOwner, isFrozen, onchainMission, count, operatorRoles, held] = await Promise.all([
       readWorkspace<readonly [boolean, bigint, bigint, bigint, number, number]>(workspace, "policy"), readWorkspace<Address>(workspace, "owner"), readWorkspace<boolean>(workspace, "frozen"),
       missionId ? readWorkspace<readonly bigint[]>(workspace, "missions", [missionId]) : Promise.resolve(null),
       publicClient().readContract({address: protocol.ledger, abi: ledgerAbi, functionName: "checkpointCount", args: [workspace]}) as Promise<bigint>,
       operator ? readWorkspace<number>(workspace, "roles", [operator]) : Promise.resolve(0),
+      Promise.all(tokens.map(async (t) => {
+        const [balance, reserved] = await Promise.all([publicClient().readContract({address: t.address, abi: erc20Abi, functionName: "balanceOf", args: [workspace]}), readWorkspace<bigint>(workspace, "reserved", [t.address])]);
+        return {...t, balance: balance.toString(), reserved: reserved.toString()};
+      })),
     ]);
     operatorActive = (operatorRoles & ROLE_OPERATOR) !== 0;
     policyInSync = current[0] === policy.autonomyEnabled && current[1] === policy.maxTransaction && current[2] === policy.dailySpend && current[3] === policy.hardCeiling && current[4] === policy.autonomousCategories && current[5] === policy.approvalCategories;
-    owner = currentOwner; frozen = isFrozen; published = !!onchainMission && onchainMission[3] !== 0n; checkpoints = Number(count);
+    owner = currentOwner; frozen = isFrozen; published = !!onchainMission && onchainMission[3] !== 0n; checkpoints = Number(count); funds = held;
   }
   const budgets = mission ? await db.select().from(s.missionBudgets).where(eq(s.missionBudgets.missionId, mission.id)) : [];
   const allocated = budgets.filter((b) => CATEGORIES.includes(b.category as (typeof CATEGORIES)[number]));
   return {
     ...protocol, operator, ref: workspaceRef(project.id), attribution: code && /^[a-z0-9_]{1,32}$/.test(code) ? toDataSuffix(code) as Hex : null, workspace,
     policy: {autonomyEnabled: policy.autonomyEnabled, maxTransaction: policy.maxTransaction.toString(), dailySpend: policy.dailySpend.toString(), hardCeiling: policy.hardCeiling.toString(), autonomousCategories: policy.autonomousCategories, approvalCategories: policy.approvalCategories},
-    policyInSync, owner, frozen, operatorActive, checkpoints,
+    policyInSync, owner, frozen, operatorActive, checkpoints, funds,
     mission: mission ? {id: protocolId("mission", mission.id), name: mission.name, budget: String(mission.budgetMicro), endsAt: String(Math.floor(mission.endsAt.getTime() / 1000)), goalHash: keccak256(toHex(canonical({name: mission.name, goal: mission.goalDescription, event: mission.goalEvent, target: mission.goalTarget}))), categories: allocated.map((b) => CATEGORIES.indexOf(b.category as (typeof CATEGORIES)[number])), budgets: allocated.map((b) => String(b.allocatedMicro)), published} : null,
   };
 }

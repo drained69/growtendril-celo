@@ -66,7 +66,7 @@ export function Chores() {
           ))}
         </Reveal>
         <Reveal delay={200}>
-          <p className="mx-auto mt-10 max-w-[460px] text-[16px] leading-relaxed text-ink/60">None of it is clever. All of it is repeated. That is exactly the work worth handing to an operator.</p>
+          <p className="mx-auto mt-10 max-w-[460px] text-[16px] leading-relaxed text-ink/60">None of it is clever. All of it is repeated. That is exactly the work worth handing to an agent.</p>
         </Reveal>
       </div>
     </Section>
@@ -397,7 +397,7 @@ export function Pricing({ startHref, signedIn }: { startHref: string; signedIn: 
             <br />
             Nothing else.
           </Headline>
-          <Lede center>No subscription and no seats. Top up prepaid credit with USDC on Celo — from {MIN_TOPUP_USDC} USDC — and each service takes its fixed price when it runs. Your separate workspace wallet pays external recipients. Credit never expires.</Lede>
+          <Lede center>No subscription and no seats. Top up prepaid credit with USDC on Celo — from {MIN_TOPUP_USDC} USDC — and each service takes its fixed price when it runs. Payments to creators come from your own workspace contract. Credit never expires.</Lede>
         </Reveal>
         <div className="mt-14 grid gap-5 md:grid-cols-3">
           {SERVICE_KEYS.map((k, i) => {
@@ -452,7 +452,7 @@ export function Terms() {
     },
     {
       title: "USDC on Celo",
-      body: "Pay a one-time Celo invoice to add service credit. Creator payouts use a separate workspace wallet. Both transfers are checked on-chain.",
+      body: "Pay a one-time Celo invoice to add service credit. Creator payouts come from your workspace contract. Both are checked onchain.",
       mock: (
         <div className="space-y-1.5 font-mono text-[12px]">
           {[["network", "Celo"], ["asset", "USDC"]].map(([k, v]) => <div key={k} className="flex justify-between rounded-[10px] bg-surface-2 px-3 py-1.5"><span className="text-ink-4">{k}</span><span>{v}</span></div>)}
@@ -461,7 +461,7 @@ export function Terms() {
     },
     {
       title: "Freeze any time",
-      body: "One switch freezes outbound workspace-wallet spending. Scans and reports can still use prepaid credit; no wallet payment is sent for each scan.",
+      body: "One switch freezes all spending from your workspace contract. Scans and reports can still use prepaid credit; no payment is sent for each scan.",
       mock: (
         <div className="flex items-center justify-between rounded-[10px] bg-surface-2 px-3 py-2 font-mono text-[12px]">
           wallet <span className="flex items-center gap-1 rounded-full bg-s1/10 px-2 py-0.5 text-s1"><Snowflake className="size-3" /> frozen</span>
@@ -508,9 +508,9 @@ const FAQ = [
   ["Does it spend money on its own?", "Every payment asks by default and names its recipient, amount, chain and reason. You can enable limited research and service purchases in Settings. Creator payments always need approval. You set the per-payment hard ceiling, which starts at 10 USDC for new workspaces. Mission budgets still apply, and taking the day's total above the daily limit asks for approval."],
   ["What kinds of products does it work for?", "Shops, apps, services, software and developer tools. It learns your customers and market from your site and a short profile, then listens in the places they talk."],
   ["Where does the evidence come from?", "Public sources you connect or that need no key. Every claim links back to the post, page or profile it came from so you can judge it yourself."],
-  ["How are payments made?", "You pay a one-time Celo USDC invoice to add GrowTendril credit; scans and reports then use that credit. Creator payouts use a separate workspace wallet, which you can freeze. You can also pay a credit invoice from that wallet with owner confirmation."],
-  ["Can my team use it too?", "Yes. Invite teammates with viewer, operator or admin roles. Approvals and settings respect those roles."],
-  ["What happens when my credit runs out?", "Nothing is lost. Paid scans and reports pause — autopilot included — until you add credit. USDC in your workspace wallet does not become scan credit automatically; you can use it to pay a Billing invoice."],
+  ["How are payments made?", "Scans and reports use prepaid credit, which you add with a one-time USDC invoice on Celo. Payments to creators and services come from your own workspace contract: you fund it from your wallet, approve every payment to a person, and can freeze it or withdraw at any time."],
+  ["Can my team use it too?", "Yes. Invite teammates as viewers, members or admins. Approvals and settings respect those roles."],
+  ["What happens when my credit runs out?", "Nothing is lost. Paid scans and reports pause — autopilot included — until you add credit. Funds in your workspace contract never turn into scan credit; add credit with a Billing invoice."],
   ["Is there a subscription?", "No. You top up USDC on Celo whenever you like and each service takes its fixed price when it runs. Credit never expires."],
 ];
 

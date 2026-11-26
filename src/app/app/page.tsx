@@ -158,7 +158,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         </Card>
       )}
 
-      {!live && <p className="px-1 text-[12px] text-ink-3">Ready to pay a creator? <Link href="/app/wallet" className="font-medium text-ink-2 underline underline-offset-4">Set up the workspace wallet</Link> when you need an operating budget for payments.</p>}
+      {!live && <p className="px-1 text-[12px] text-ink-3">Ready to pay a creator? <Link href="/app/wallet" className="font-medium text-ink-2 underline underline-offset-4">Create your workspace contract</Link> to hold the budget the agent can pay from, under your rules.</p>}
 
       {mission && sum ? (
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -350,7 +350,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
       </div>
 
       <Card>
-        <CardHeader title="Payments" description="x402 nanopayments and on-chain transfers on Celo" action={more("/app/activity", "Full trace")} />
+        <CardHeader title="Payments" description="Creator payouts and paid research on Celo" action={more("/app/activity", "Full trace")} />
         {txs.length ? (
           <ul className="divide-y divide-line">
             {txs.map((t) => (

@@ -26,9 +26,10 @@ if (linked !== PROJECT) throw new Error(`Refusing to upload: this folder must be
 const names = ALLOWED.filter((name) => process.env[name]?.trim());
 console.log(`${dryRun ? "Would upload" : "Uploading"} ${names.length} variables to ${PROJECT}/${SERVICE}:\n${names.join("\n")}`);
 if (dryRun || !names.length) process.exit(0);
-for (const [index, name] of names.entries()) {
-  const last = index === names.length - 1;
-  const result = spawnSync("railway", ["variable", "set", name, "--stdin", "--service", SERVICE, ...(last ? [] : ["--skip-deploys"])], {input: process.env[name]!.trim(), encoding: "utf8"});
+for (const name of names) {
+  const result = spawnSync("railway", ["variable", "set", name, "--stdin", "--service", SERVICE, "--skip-deploys"], {input: process.env[name]!.trim(), encoding: "utf8"});
   if (result.status !== 0) throw new Error(`Railway did not accept ${name}. Nothing further was uploaded.`);
 }
+// Railway skips the redeploy when the last value set is unchanged, so always redeploy explicitly.
+if (spawnSync("railway", ["redeploy", "--service", SERVICE, "--yes"], {encoding: "utf8"}).status !== 0) throw new Error("Uploaded, but Railway did not start a redeploy. Run: railway redeploy --service web");
 console.log("Uploaded. Railway is redeploying the web service.");

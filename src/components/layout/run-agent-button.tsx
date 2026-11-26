@@ -103,7 +103,7 @@ export function RunAgentButton({ disabled, priceUsdc, creditLow, ownsCredit }: {
       >
         {running ? (status === "queued" ? "Queued…" : "Running…") : "Run agent"}
       </Button>
-      <Dialog open={open} onClose={() => setOpen(false)} title={`Operator cycle${status ? ` · ${status}` : ""}`} description={running ? "You can close this view and reopen it with the running button." : "Review the outcome and each recorded step."} size="lg">
+      <Dialog open={open} onClose={() => setOpen(false)} title={`Agent cycle${status ? ` · ${status}` : ""}`} description={running ? "You can close this view and reopen it with the running button." : "Review the outcome and each recorded step."} size="lg">
         {error && <Callout tone="danger" className="mb-3">{error}</Callout>}
         {log.length ? <AgentLog log={log} /> : <div role="status" className="rounded-[14px] border border-dashed border-line-strong bg-surface-2 px-3 py-5 text-center text-[12.5px] text-ink-3">{running ? "Waiting for the worker to report progress…" : "No steps were recorded for this cycle."}</div>}
         <Link href="/app/runs" onClick={() => setOpen(false)} className="mt-3 inline-block text-[12px] text-s1 hover:underline">View all agent runs</Link>

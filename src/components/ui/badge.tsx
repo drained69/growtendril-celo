@@ -25,7 +25,7 @@ export function Badge({ children, tone = "neutral", className, dot }: { children
 const MODE: Record<string, { tone: Tone; title: string }> = {
   DEMO: { tone: "accent", title: "Fictional seeded data" },
   SIMULATED: { tone: "warn", title: "Would have happened — nothing moved" },
-  TESTNET: { tone: "info", title: "Real Circle / Celo Testnet activity" },
+  TESTNET: { tone: "info", title: "Celo testnet activity" },
   LIVE: { tone: "good", title: "Real public data" },
 };
 

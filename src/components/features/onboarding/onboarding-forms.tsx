@@ -226,7 +226,7 @@ export function MissionStep({ audience, category }: { audience?: string | null; 
           </Field>
         </div>
       </div>
-      <StepFooter error={!pending && state && !state.ok ? state.error : null} note="The budget is a ceiling, not a commitment — unspent USDC stays in the wallet.">
+      <StepFooter error={!pending && state && !state.ok ? state.error : null} note="The budget is a ceiling, not a commitment. Unspent USDC stays in your workspace contract, and you can withdraw it any time.">
         <Button type="submit" variant="primary" size="md" loading={pending}>
           Set mission
           {!pending && <ArrowRight />}
@@ -241,7 +241,7 @@ export function MissionStep({ audience, category }: { audience?: string | null; 
 const LIMITS = [
   { name: "autonomousLimit", label: "Spend on its own up to", d: "0", hint: "Per payment, for research, data and API services from the Celo research catalog. 0 = always ask you first", fixed: false },
   { name: "dailySpend", label: "Daily limit", d: "10", hint: "Above this total in a day, every payment asks you first", fixed: false },
-  { name: "hardCeiling", label: "Per-payment hard ceiling", d: "10", hint: "Choose your maximum per payment; approval cannot exceed it. Starts at 10 USDC", fixed: false },
+  { name: "hardCeiling", label: "Per-payment hard ceiling", d: "10", hint: "The largest single payment, even with your approval. Starts at 10 USDC; raise it if you plan bigger creator rewards", fixed: false },
 ];
 
 export function AutonomyStep({ autopilot, billing }: { autopilot: Record<string, string>; billing?: boolean }) {
@@ -267,7 +267,7 @@ export function AutonomyStep({ autopilot, billing }: { autopilot: Record<string,
       <div className="border-t border-line p-4">
         <div className="text-[12.5px] font-medium text-ink">Autopilot</div>
         <p className="text-[11.5px] text-ink-3">
-          How often the operator runs a full cycle on its own. You can change this in Settings.
+          How often the agent runs a full cycle on its own. You can change this in Settings.
           {billing && <> Each run is one market scan ({SERVICES.scan.priceUsdc} USDC). If enabled, an overdue run can start as soon as you add credit.</>}
         </p>
         <input type="hidden" name="autopilot" value={cadence} />

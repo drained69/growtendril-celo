@@ -15,7 +15,7 @@
 | Check | Result |
 |---|---|
 | TypeScript | Clean |
-| App tests | 46 files, 422 tests passed |
+| App tests | 46 files, 421 tests passed |
 | Contract tests | 52 passed, including 11 invariant tests |
 | Invariant fuzzing, 11 safety rules (local run: 2,000 sequences of 256 random actions) | 512,000 actions per rule, no violation |
 | Contract test against forked Celo USDC | Passed |
@@ -82,6 +82,10 @@ The partial Plamen run listed 97 candidates, many of them twice. None had been v
 **Application**
 
 - Before the owner signs, the server checks that the payment recorded on Celo matches the approval, and that a conversion's minimum payout is at least 85% of Textile's live rate.
+- The Wallet page leads with the workspace contract, shows each token's balance, reserved and free amounts, and lists the next setup step (publish rules, publish the mission, deposit). Operator-only setup no longer appears to customers.
+- When the contract refuses an action, the owner sees what to do about it instead of the contract's raw reason.
+- Linking a new workspace contract retries briefly, so a just-confirmed creation is not rejected by a lagging RPC node.
+- Saving new limits reminds the owner to publish them to the workspace contract.
 - Approval now checks the recipient and amount onchain, and the wallet shows those terms before signing.
 - Rejecting a payment also closes it onchain.
 - Linking a workspace and saving an Altana wallet are restricted to the right roles.

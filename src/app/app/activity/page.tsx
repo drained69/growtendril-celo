@@ -12,9 +12,10 @@ import { Badge, Card, CardFooter, CardHeader, ExternalLink, ModeBadge, PageHeade
 import { DataTable } from "@/components/ui/data-table";
 import { ActionButton } from "@/components/features/agent/action-button";
 import { ChainCheckBadge } from "@/components/features/wallet/chain-check-badge";
+import { RAIL_AUTH, RAIL_LABEL } from "@/lib/rails";
 
-const RAIL: Record<string, string> = { growth_vault: "Workspace contract", textile_corridor: "Textile FX corridor", celo_x402: "x402 · Celo", celo_usdc_send: "Celo wallet Send", app_kit_bridge: "Celo wallet Bridge", gateway_deposit: "Gateway deposit (historical)" };
-const AUTH: Record<string, string> = { growth_vault: "Owner wallet approval, enforced onchain", textile_corridor: "Atomic convert and deliver", celo_x402: "EIP-712 TransferWithAuthorization", celo_usdc_send: "Celo wallet adapter tx", app_kit_bridge: "Celo wallet adapter tx", gateway_deposit: "approve + deposit" };
+const RAIL = RAIL_LABEL;
+const AUTH = RAIL_AUTH;
 const humanize = (k: string) => k.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
 export default async function Activity() {
@@ -58,7 +59,7 @@ export default async function Activity() {
       </StatStrip>
 
       <Card>
-        <CardHeader title="Payment trace" description="x402 nanopayments and on-chain transfers on Celo" icon={<Receipt />} />
+        <CardHeader title="Payment trace" description="Creator payouts and paid research on Celo, each checked against the chain" icon={<Receipt />} />
         <DataTable
           searchable
           defaultSort={{ key: "when", dir: "desc" }}
@@ -204,7 +205,7 @@ export default async function Activity() {
             ))}
           </ul>
         ) : (
-          <p className="px-4 py-3 text-[12.5px] text-ink-3">No operator runs yet — start one with “Run cycle” or turn on autopilot in Settings.</p>
+          <p className="px-4 py-3 text-[12.5px] text-ink-3">No agent runs yet. Start one with “Run agent” or turn on autopilot in Settings.</p>
         )}
       </Card>
     </div>

@@ -163,7 +163,7 @@ try {
   check("Owner removes the agent and the app keeps working", removed?.operatorActive === false);
   const fourth = await propose(4);
   const fourthTx = await txFor(fourth.decisionId);
-  await refuses("A removed agent cannot publish a payment", () => protocol.ensureVaultIntent(db, fourthTx, fourthTx.amountMicro), /not authorized/);
+  await refuses("A removed agent cannot publish a payment", () => protocol.ensureVaultIntent(db, fourthTx, fourthTx.amountMicro), /not allowed to act on your workspace contract/);
   await send(workspace, ws, "setRole", [agent, 4]);
   const restored = await protocol.loadProtocolView(db, {id: "project"}, linked, policy, missionRow);
   check("Owner can restore the agent", restored?.operatorActive === true);

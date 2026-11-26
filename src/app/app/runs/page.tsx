@@ -14,7 +14,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ActionButton } from "@/components/features/agent/action-button";
 import { AgentLog } from "@/components/features/agent/agent-log";
 
-const KIND_LABEL: Record<string, string> = { cycle: "Operator cycle", settlements: "Settlement check", gateway_deposit: "Gateway deposit (historical)", cleanup: "Cleanup" };
+const KIND_LABEL: Record<string, string> = { cycle: "Agent cycle", settlements: "Settlement check", gateway_deposit: "Wallet deposit", cleanup: "Cleanup" };
 const TRIGGER_LABEL: Record<string, string> = { system: "System", user: "Manual", schedule: "Autopilot", manual: "Manual", demo: "Demo" };
 
 function duration(a: Date | null, b: Date | null): string {
@@ -56,7 +56,7 @@ export default async function Runs() {
             {project.lastCycleAt ? <span>Last cycle {relTime(project.lastCycleAt)}</span> : <span>No cycle has run yet</span>}
           </>
         }
-        actions={can(role, "operate") && <ActionButton action={runCycleAction} label={priced("Run cycle", "scan")} variant="primary" icon={<Radar />} />}
+        actions={can(role, "operate") && <ActionButton action={runCycleAction} label={priced("Run agent", "scan")} variant="primary" icon={<Radar />} />}
       />
 
       <StatStrip className="grid-cols-2 lg:grid-cols-4">
@@ -147,7 +147,7 @@ export default async function Runs() {
             sort: { kind: j.kind, trigger: j.trigger, status: j.status, attempts: j.attempts, created: j.createdAt.getTime(), finished: j.finishedAt?.getTime() ?? null },
             search: `${KIND_LABEL[j.kind] ?? j.kind} ${j.trigger} ${j.status} ${skippedReason(j) ?? ""} ${j.lastError ?? ""} ${j.id}`,
           }))}
-          empty={<p className="text-center text-[12.5px] text-ink-3">No jobs yet. “Run cycle”, autopilot, settlement checks and Gateway deposits all appear here as they’re queued.</p>}
+          empty={<p className="text-center text-[12.5px] text-ink-3">No jobs yet. Agent runs, autopilot and settlement checks appear here as they’re queued.</p>}
         />
       </Card>
 

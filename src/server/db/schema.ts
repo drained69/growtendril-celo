@@ -1095,6 +1095,8 @@ export const creatorPrograms = pgTable("creator_programs", {
   outcomeBonusMicro: micro("outcome_bonus_micro").notNull(), outcomeCap: integer("outcome_cap").notNull(),
   /** Set only after Celo shows a campaign from this funder with these exact terms. */
   escrowCampaignId: text("escrow_campaign_id"), escrowOwner: text("escrow_owner"),
+  /** invite: private creator invites (v1 escrow). open: anyone with the link (CampaignEscrow). */
+  mode: text("mode").notNull().default("invite"), escrowContract: text("escrow_contract"), escrowVersion: text("escrow_version"),
   createdAt: createdAt(),
 });
 export const creatorParticipants = pgTable("creator_participants", {
@@ -1135,3 +1137,108 @@ export const customerValueSettings = pgTable("customer_value_settings", {
   updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: updatedAt(),
 });
+
+// ───────────────────────────── open reward campaigns ─────────────────────────────
+
+/**
+ * A campaign anyone with the link can join. The money sits in CampaignEscrow on Celo; GrowTendril
+ * checks each claim and its agent queues the reward, and the owner can object during the hold.
+ * Reuses creator_programs (mode 'open') and an experiment with budget 0, so mission budgets aren't counted twice.
+ */
+export const openCampaigns = pgTable("open_campaigns", {
+  id: id(),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  programId: text("program_id").notNull().unique().references(() => creatorPrograms.id, { onDelete: "cascade" }),
+  slug: text("slug").notNull().unique(),
+  status: text("status").notNull().default("draft"), // draft | funding | live | ended | closed
+  title: text("title").notNull(),
+  task: text("task").notNull(),
+  proofKind: text("proof_kind").notNull(), // x | bluesky | youtube | tiktok | link
+  requiredText: text("required_text"),
+  criteria: text("criteria"),
+  minScore: integer("min_score"),
+  durationDays: integer("duration_days").notNull(),
+  /** Fixed when the owner first prepares funding; part of the terms hash. */
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  termsText: text("terms_text"),
+  termsVersion: text("terms_version"),
+  termsHash: text("terms_hash"),
+  autoApprove: boolean("auto_approve").notNull().default(true),
+  agentAddress: text("agent_address"),
+  escrowContract: text("escrow_contract"),
+  escrowSalt: text("escrow_salt"),
+  escrowCampaignId: text("escrow_campaign_id"),
+  ownerAddress: text("owner_address"),
+  fundingTx: text("funding_tx"),
+  fundingBlock: text("funding_block"),
+  fundedAt: timestamp("funded_at", { withTimezone: true }),
+  refundTx: text("refund_tx"),
+  refundedAt: timestamp("refunded_at", { withTimezone: true }),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, t => [index("open_campaigns_project_idx").on(t.projectId, t.status)]);
+
+export const openParticipants = pgTable("open_participants", {
+  id: id(),
+  openCampaignId: text("open_campaign_id").notNull().references(() => openCampaigns.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Their own tracked link (/r/[code]). */
+  campaignId: text("campaign_id").notNull().unique().references(() => campaigns.id),
+  /** GT-XXXXXX: shown in the post, proves it was made after joining. */
+  code: text("code").notNull().unique(),
+  payoutAddress: text("payout_address").notNull(),
+  status: text("status").notNull().default("agreed"),
+  joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: createdAt(),
+}, t => [uniqueIndex("open_participant_user_uq").on(t.openCampaignId, t.userId), uniqueIndex("open_participant_wallet_uq").on(t.openCampaignId, t.payoutAddress)]);
+
+/** The plain-words agreement, signed with the payout wallet (also proves the person controls it). */
+export const openAgreements = pgTable("open_agreements", {
+  id: id(),
+  openCampaignId: text("open_campaign_id").notNull().references(() => openCampaigns.id, { onDelete: "cascade" }),
+  participantId: text("participant_id").notNull().unique().references(() => openParticipants.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  address: text("address").notNull(),
+  termsHash: text("terms_hash").notNull(),
+  termsVersion: text("terms_version").notNull(),
+  message: text("message").notNull(),
+  signature: text("signature").notNull(),
+  signedAt: timestamp("signed_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
+
+export const openClaims = pgTable("open_claims", {
+  id: id(),
+  openCampaignId: text("open_campaign_id").notNull().references(() => openCampaigns.id, { onDelete: "cascade" }),
+  participantId: text("participant_id").notNull().unique().references(() => openParticipants.id, { onDelete: "cascade" }),
+  proofUrl: text("proof_url").notNull(),
+  // checking | needs_owner | rejected | approved_waiting | queueing | approved_queued | objected | paid
+  status: text("status").notNull().default("checking"),
+  checks: jsonb("checks").$type<{ key: string; result: "pass" | "fail" | "unsure"; detail: string }[]>().notNull().default([]),
+  score: integer("score"),
+  author: text("author"),
+  proofTextHash: text("proof_text_hash"),
+  quality: integer("quality"),
+  outcomes: integer("outcomes").notNull().default(0),
+  amountMicro: micro("amount_micro"),
+  /** keccak256 of a fixed string per participant, so a retried queue is idempotent onchain. */
+  rewardId: text("reward_id").notNull().unique(),
+  evidenceHash: text("evidence_hash"),
+  decidedBy: text("decided_by"), // auto | user id
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  rejectReason: text("reject_reason"),
+  attempts: integer("attempts").notNull().default(1),
+  queueTx: text("queue_tx"),
+  queueError: text("queue_error"),
+  queueFailures: integer("queue_failures").notNull().default(0),
+  queuedAt: timestamp("queued_at", { withTimezone: true }),
+  claimableAt: timestamp("claimable_at", { withTimezone: true }),
+  objectionReason: text("objection_reason"),
+  objectTx: text("object_tx"),
+  objectedAt: timestamp("objected_at", { withTimezone: true }),
+  payTx: text("pay_tx"),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, t => [uniqueIndex("open_claim_proof_uq").on(t.openCampaignId, t.proofUrl), index("open_claims_status_idx").on(t.status)]);

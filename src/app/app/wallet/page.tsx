@@ -18,6 +18,7 @@ import { Callout, Card, CardBody, CardHeader, ExternalLink, KeyValue, PageHeader
 import { CopyField } from "@/components/ui/copy";
 import { ActionButton } from "@/components/features/agent/action-button";
 import { LedgerExceptions } from "@/components/features/wallet/ledger-exceptions";
+import { UsdcHelp } from "@/components/features/billing/usdc-help";
 import { WithdrawForm } from "@/components/features/wallet/withdraw-form";
 import { withdrawable } from "@/server/domain/agent/withdraw";
 import { exceptionsFor } from "@/server/domain/reconcile/exceptions";
@@ -48,11 +49,12 @@ export default async function WalletPage() {
   const contractFunds = contract ? protocol?.funds ?? [] : [];
   const usdcHeld = contract ? contractFunds.find((f) => f.token === "USDC")?.balance : balances.walletMicro;
   const usdtHeld = contractFunds.find((f) => f.token === "USD₮")?.balance;
-  const showServerWallet = !!wallet?.address && !contract ? true : !wallet && !protocol && operatorWorkspace;
+  // An Altana wallet has its own card below; only a server-held wallet gets this one.
+  const showServerWallet = (!!wallet?.address && !contract && wallet.provider !== "altana") || (!wallet && !protocol && operatorWorkspace);
   return <div className="space-y-4">
-    <PageHeader title="Wallet" description="Fund growth work with USDC on Celo. Payments to people always need your approval; research purchases follow your spending limits."
-      meta={<span>{CELO.name} · chain {CELO.chainId}</span>}
-      actions={<ActionButton action={refreshSettlementsAction} label="Refresh settlements" icon={<RefreshCw />} />} />
+    <PageHeader title="Payout account" description="The money that pays people, such as creators. It stays in an account only you control, and we ask you before paying any person."
+      actions={<ActionButton action={refreshSettlementsAction} label="Check for payment updates" icon={<RefreshCw />} />} />
+    <UsdcHelp />
     <StatStrip className="grid-cols-2 lg:grid-cols-4">
       <Stat label={contract ? "Contract USDC" : "Wallet USDC"} value={usdcHeld == null ? "—" : fmtUsdc(Number(usdcHeld))} sub={contract ? `${usdtHeld ? fmtUsdc(Number(usdtHeld)).replace("USDC", "USD₮") : "0 USD₮"} for local payouts` : wallet ? "Celo balance" : "No wallet yet"} />
       <Stat label="Spent today" value={fmtUsdc(spent)} sub={`Daily limit ${fmtUsdc(policy?.dailySpendMicro ?? 0)}`} />
@@ -73,7 +75,7 @@ export default async function WalletPage() {
           <CopyField value={wallet.address} />
           <ExternalLink href={addressExplorerUrl("Celo", wallet.address)}>View on Celoscan</ExternalLink>
           <KeyValue items={[
-            {k: "Network", v: CELO.name}, {k: "Status", v: wallet.frozen ? "Frozen" : live ? "Ready" : "Signing unavailable"},
+            {k: "Network", v: CELO.name}, {k: "Status", v: wallet.frozen ? "Paused" : live ? "Ready to pay" : "Not ready to pay yet"},
             {k: "USDC", v: <ExternalLink href={addressExplorerUrl("Celo", CELO.usdc)}>Token contract</ExternalLink>},
             {k: "Payment receipts", v: <Link href="/app/receipts">Review receipts →</Link>},
           ]} />

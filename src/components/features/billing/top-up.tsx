@@ -67,7 +67,7 @@ export function TopUpForm({ mode, suggested }: { mode: Mode; suggested?: number 
           <span className="num text-[12px] text-ink-3">USDC</span>
         </label>
         <Button type="submit" variant="primary" size="lg" loading={pending} disabled={!hydrated || !valid}>
-          {mode === "celo" ? "Pay on Celo" : "Add credit"}
+          {mode === "celo" ? "Continue to payment" : "Add credit"}
           {!pending && <ArrowRight />}
         </Button>
       </div>

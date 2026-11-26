@@ -84,7 +84,7 @@ export function PayInvoice(p: { invoiceId: string; payTo: string; amountMicro: n
     if (sending.current || sentHash || expired || done.current) return;
     const eth = window.ethereum;
     if (!eth) {
-      toast.error("No browser wallet found", "Install a wallet such as MetaMask or Rabby, or send the USDC from any wallet using the details above.");
+      toast.error("No browser wallet found", "Open this page inside a wallet app such as MiniPay, Valora or MetaMask, or send the USDC from any wallet using the details above.");
       return;
     }
     if (!p.attributionCode) { toast.error("Payments are not configured", "The operator needs to configure the Celo attribution tag."); return; }
@@ -145,7 +145,7 @@ export function PayInvoice(p: { invoiceId: string; payTo: string; amountMicro: n
   return (
     <div className="space-y-5">
       <Button variant="primary" size="lg" className="w-full" icon={status === "sending" || status === "confirming" ? <Loader2 className="animate-spin" /> : <Wallet />} disabled={expired || status !== "waiting"} onClick={payWithWallet}>
-        {expired ? "Invoice expired" : status === "sending" ? "Confirm in your wallet…" : status === "confirming" ? "Payment sent — checking Celo…" : "Pay with browser wallet"}
+        {expired ? "Invoice expired" : status === "sending" ? "Confirm in your wallet…" : status === "confirming" ? "Payment sent — checking Celo…" : "Pay from my wallet"}
       </Button>
       {sentHash && (
         <p className="text-center text-[12px] text-ink-3">

@@ -34,12 +34,12 @@ export function PayWorkspaceWallet({ invoiceId, amountMicro, availableMicro, bal
 
   return (
     <div className="space-y-3 rounded-[14px] border border-line bg-surface-2 p-4">
-      <div className="flex items-center gap-2 text-[13px] font-semibold text-ink"><Wallet className="size-4" /> Pay from workspace wallet</div>
+      <div className="flex items-center gap-2 text-[13px] font-semibold text-ink"><Wallet className="size-4" /> Pay from your Payout account</div>
       <p className="text-[12px] leading-relaxed text-ink-3">
-        Move exactly {fmtUsdc(amountMicro)} from this workspace&apos;s Celo wallet to GrowTendril billing. You&apos;ll approve the transfer with an email code. Credit appears only after Celo confirms it.
+        Move exactly {fmtUsdc(amountMicro)} from this workspace&apos;s Payout account into credit. We email you a code to confirm it, and the credit appears once the payment arrives.
       </p>
-      <p className="text-[12px] text-ink-2">Wallet: <span className="num">{fmtUsdc(balanceMicro)}</span> · Available after fee reserve: <span className="num">{fmtUsdc(availableMicro)}</span></p>
-      {!enough && <Callout tone="warn">Add at least {fmtUsdc(amountMicro - availableMicro)} to your workspace wallet, or pay from another wallet below. The wallet keeps 0.05 USDC for Celo network fees.</Callout>}
+      <p className="text-[12px] text-ink-2">Payout account: <span className="num">{fmtUsdc(balanceMicro)}</span> · Available after the fee reserve: <span className="num">{fmtUsdc(availableMicro)}</span></p>
+      {!enough && <Callout tone="warn">Add at least {fmtUsdc(amountMicro - availableMicro)} to your Payout account, or pay from another wallet below. It keeps 0.05 USDC back for network fees.</Callout>}
       {error && <Callout tone="danger">{error}</Callout>}
       {message && <Callout tone="info">{message}</Callout>}
       {!sent && !codeSent && <Button type="button" variant="secondary" icon={<Mail />} loading={busy} disabled={!enough} onClick={requestCode}>Email me a payment code</Button>}

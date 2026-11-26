@@ -14,6 +14,7 @@ import { Badge, Callout, Card, CardBody, CardHeader, LinkButton, Table, cn } fro
 import { CountUp } from "@/components/ui/count-up";
 import { Logo, LogoMark } from "@/components/layout/logo";
 import { TopUpButton, TopUpForm } from "@/components/features/billing/top-up";
+import { UsdcHelp } from "@/components/features/billing/usdc-help";
 
 export const dynamic = "force-dynamic";
 
@@ -71,12 +72,13 @@ export default async function Billing() {
       <div className="app-main mx-auto max-w-4xl px-4 py-8">
         <div className="space-y-5">
           <div>
-            <h1 className="display display-bounce text-[clamp(1.9rem,3.2vw,2.5rem)] leading-tight text-ink">Billing &amp; credit</h1>
+            <h1 className="display display-bounce text-[clamp(1.9rem,3.2vw,2.5rem)] leading-tight text-ink">Billing: your credit</h1>
             <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-ink-3">
-              Top up USDC on Celo once, then pay only for what runs. Each service has one fixed price, taken from your balance when it runs — whoever on your team starts it. Browsing, settings, team and exports are free.
+              Credit pays for scans and reports. Add it with USDC (a digital dollar: 1 USDC = $1), then each service takes its fixed price when it runs, whoever on your team starts it. There is no subscription. Browsing, settings, team and exports are free.
             </p>
-            {mode !== "off" && <p className="mt-2 max-w-2xl text-[12.5px] leading-relaxed text-ink-3">Scan credit is separate from your workspace wallet. To use wallet USDC for a scan, create a {SERVICES.scan.priceUsdc} USDC invoice here and choose &ldquo;Pay from workspace wallet&rdquo; on its payment page. You approve the transfer by email, and credit is added after Celo confirms it. The exact invoice amount includes a small identifying suffix; the workspace wallet also keeps 0.05 USDC for Celo fees.</p>}
+            {mode !== "off" && <p className="mt-2 max-w-2xl text-[12.5px] leading-relaxed text-ink-3">Credit is separate from your <Link href="/app/wallet" className="underline">Payout account</Link>, which holds the money that pays people. Money in your Payout account never turns into credit on its own.</p>}
           </div>
+          {mode !== "off" && <UsdcHelp />}
 
           {mode === "off" && (
             <Callout tone="info" title="Billing isn't enabled on this deployment">
@@ -98,16 +100,16 @@ export default async function Billing() {
           )}
           {scheduledWorkspaces.length > 0 && mode === "celo" && (
             <Callout tone="warn" title="Autopilot can use new credit automatically" action={<LinkButton href="/app/settings#autopilot" size="sm" variant="secondary">Autopilot settings</LinkButton>}>
-              {scheduledWorkspaces.map((p) => p.name).join(", ")} {scheduledWorkspaces.length === 1 ? "has" : "have"} Autopilot enabled. A due market scan may start as soon as your top-up settles and use {SERVICES.scan.priceUsdc} USDC. Pause Autopilot before paying if you want to run the scan yourself.
+              {scheduledWorkspaces.map((p) => p.name).join(", ")} {scheduledWorkspaces.length === 1 ? "has" : "have"} Autopilot on. A scan that is due can start as soon as your money arrives and use {SERVICES.scan.priceUsdc} USDC. Turn Autopilot off first if you would rather start the scan yourself.
             </Callout>
           )}
           {latestTopup && latestCharge && balance < servicePriceMicro("scan") && (
-            <Callout tone="info" title={latestCharge.note === "Autopilot scan" ? "Your top-up funded an Autopilot scan" : "Your top-up funded a service"} action={<LinkButton href="/app/runs" size="sm" variant="secondary">View runs</LinkButton>}>
+            <Callout tone="info" title={latestCharge.note === "Autopilot scan" ? "Your top-up funded an Autopilot scan" : "Your top-up funded a service"} action={<LinkButton href="/app/runs" size="sm" variant="secondary">See scan history</LinkButton>}>
               {exactUsdc(latestTopup.amountMicro)} USDC was added to your credit, then {exactUsdc(-latestCharge.amountMicro)} USDC was charged for {latestCharge.note === "Autopilot scan" ? "a scheduled scan" : latestCharge.service ?? "a service"}. Your exact current balance is {exactUsdc(balance)} USDC.
             </Callout>
           )}
           {correctedScan && (
-            <Callout tone="success" title="Your scan credit was restored" action={<LinkButton href="/app/discover" size="sm" variant="primary">Run a scan</LinkButton>}>
+            <Callout tone="success" title="Your credit was given back" action={<LinkButton href="/app/discover" size="sm" variant="primary">Go to Discover</LinkButton>}>
               {exactUsdc(correctedScan.amountMicro)} USDC was returned to your credit after a scan started by the Quick Start Autopilot default. Your exact current balance is {exactUsdc(balance)} USDC. {ownedWorkspaces.find((p) => p.id === correctedScan.projectId)?.autopilot === "off" ? "Autopilot is paused for this workspace." : "Review your Autopilot setting before adding more credit."}
             </Callout>
           )}
@@ -117,7 +119,7 @@ export default async function Billing() {
               <LogoMark size={170} sway className="pointer-events-none absolute -bottom-8 -right-6 text-accent opacity-[0.1]" />
               <div className="relative">
                 <div className="flex items-center gap-2 text-[12px] font-medium text-ink-3">
-                  <Coins className="size-4" /> Balance
+                  <Coins className="size-4" /> Credit
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className={cn("display text-[clamp(2rem,5vw,3.5rem)] leading-none", balance > 0 ? "text-ink" : "text-ink-3")}>
@@ -126,7 +128,7 @@ export default async function Billing() {
                   <span className="num text-[14px] text-ink-3">USDC</span>
                 </div>
                 <p className="mt-3 text-[12.5px] text-ink-3">
-                  {mode === "off" ? "Not needed while billing is off." : balance > 0 ? <>Enough for <span className="num text-ink-2">{scans}</span> market scan{scans === 1 ? "" : "s"}.</> : "Top up to start running scans and reports."}
+                  {mode === "off" ? "Not needed while billing is off." : balance > 0 ? <>Enough for <span className="num text-ink-2">{scans}</span> scan{scans === 1 ? "" : "s"} for customers.</> : "Add credit to start scanning for customers."}
                 </p>
                 <div className="mt-5 grid grid-cols-2 gap-3 border-t border-line pt-4 text-[12px]">
                   <div>
@@ -142,9 +144,9 @@ export default async function Billing() {
             </div>
 
             <Card>
-              <CardHeader title="Add credit" description={mode === "celo" ? "Create a Celo USDC invoice. Credit appears after your payment is confirmed." : "Choose an amount."} icon={<Sparkles />} />
+              <CardHeader title="Add credit" description={mode === "celo" ? "Pick an amount, then send that much USDC on Celo. Your credit appears as soon as the payment arrives." : "Choose an amount."} icon={<Sparkles />} />
               <CardBody>
-                {mode === "off" ? <p className="text-[12.5px] text-ink-3">Nothing to pay while billing is off.</p> : <div className="space-y-3"><TopUpForm mode={mode} suggested={balance === 0 ? 10 : undefined} />{mode === "celo" && owned && balance < servicePriceMicro("scan") && <TopUpButton usdc={SERVICES.scan.priceUsdc} mode="celo" label="Create invoice to fund one scan" />}</div>}
+                {mode === "off" ? <p className="text-[12.5px] text-ink-3">Nothing to pay while billing is off.</p> : <div className="space-y-3"><TopUpForm mode={mode} suggested={balance === 0 ? 10 : undefined} />{mode === "celo" && owned && balance < servicePriceMicro("scan") && <TopUpButton usdc={SERVICES.scan.priceUsdc} mode="celo" label="Add just enough for one scan" />}</div>}
               </CardBody>
             </Card>
           </div>
@@ -172,7 +174,7 @@ export default async function Billing() {
           </Card>
 
           <Card>
-            <CardHeader title="Recent activity" description="Latest 100 top-ups, charges and refunds. Balance and totals include your full history." />
+            <CardHeader title="Recent activity" description="Your latest 100 top-ups, charges and refunds. The balance counts your full history." />
             {ledger.length ? (
               <Table>
                 <thead>
@@ -210,13 +212,13 @@ export default async function Billing() {
                 </tbody>
               </Table>
             ) : (
-              <CardBody className="text-[12.5px] text-ink-3">Nothing yet. {owned ? "Top up, then run a market scan from your workspace." : "Set up a workspace, then top up to run its first scan."}</CardBody>
+              <CardBody className="text-[12.5px] text-ink-3">Nothing yet. {owned ? "Add credit, then scan for customers from your workspace." : "Set up a workspace, then add credit to run its first scan."}</CardBody>
             )}
           </Card>
 
           {paid.length > 0 && (
             <Card>
-              <CardHeader title="Recent payments on Celo" description="The latest invoices and their USDC transfers on Celo." />
+              <CardHeader title="Your top-up payments" description="Each payment you sent, with a link to it on Celoscan as proof." />
               <Table>
                 <thead>
                   <tr>
@@ -247,7 +249,7 @@ export default async function Billing() {
           )}
 
           <p className="text-center text-[11.5px] text-ink-4">
-            Top-ups go straight to GrowTendril&apos;s Celo address and are checked on-chain; GrowTendril never holds your keys. Receipts are emailed to {user.email}. Credit is charged to the account that owns a workspace; teammates you invite use the owner&apos;s balance.
+            We check every top-up on Celo before adding credit, and we never hold your keys. Receipts are emailed to {user.email}. Credit belongs to the workspace owner; teammates you invite use the owner&apos;s credit.
           </p>
         </div>
       </div>

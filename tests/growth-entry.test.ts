@@ -78,7 +78,7 @@ describe("next growth decision", () => {
     expect(nextGrowthStep({ ...ready, readySources: 0, creditMicro: 0 })).toMatchObject({ kind: "link", href: "/app/integrations" });
   });
   it("routes insufficient owner credit to billing, and member credit to the owner", () => {
-    expect(nextGrowthStep({ ...ready, creditMicro: 999_999 })).toMatchObject({ kind: "link", href: "/billing" });
+    expect(nextGrowthStep({ ...ready, creditMicro: 499_999 })).toMatchObject({ kind: "link", href: "/billing" });
     expect(nextGrowthStep({ ...ready, creditMicro: 0, permissions: { ...ready.permissions, ownsCredit: false } })).toMatchObject({ kind: "link", href: "/app/team" });
   });
   it("allows reviewing existing opportunities even when service credit runs out", () => {

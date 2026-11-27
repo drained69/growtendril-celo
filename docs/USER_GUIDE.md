@@ -17,7 +17,7 @@ GrowTendril keeps two separate pots of money. Knowing which is which answers mos
 | What it's for | Running the product: market scans, influencer reports, campaign briefs | Paying creators, bounty winners and data sellers for your experiments |
 | Where you send USDC | GrowTendril's billing address on Celo (use the address shown on your Celo payment page) | Your workspace's own wallet address on Celo (shown on the **Wallet** page) |
 | Who controls it | Becomes prepaid credit on your account | A dedicated server-controlled wallet explicitly bound to your workspace |
-| How it leaves | Each service deducts its fixed price when it runs: scan **1 USDC**, influencer report **1.5 USDC**, campaign brief **1 USDC** (first draft per creator free). Failed services are refunded automatically. | Only three ways: **(1)** a payment you approve to a named recipient, **(2)** a research purchase within limits you enabled, **(3)** you withdraw it to your own address |
+| How it leaves | Each service deducts its fixed price when it runs: scan **0.5 USDC**, creator report **0.75 USDC**, campaign brief **0.5 USDC** (first draft per creator free). Failed services are refunded automatically. | Only three ways: **(1)** a payment you approve to a named recipient, **(2)** a research purchase within limits you enabled, **(3)** you withdraw it to your own address |
 | Limits | — | Every payment stays within your workspace's per-payment ceiling and mission budget. The ceiling starts at **10 USDC** and is editable in Settings. Payments taking the day's total above the daily limit ask you first; creator payouts always ask you first. |
 | Proof | Receipt email with the Celo transaction | A receipt for every payment, checked against Celo; mismatches are flagged |
 
@@ -48,7 +48,7 @@ Everything here can be changed later in **Settings**.
 ## 3. Add credit (to run scans)
 
 1. Open **Billing** (the **Top up** button in the sidebar, or the credit badge).
-2. Choose an amount (from **1 USDC**) and click **Pay on Celo**.
+2. Choose an amount (from **0.5 USDC**) and click **Continue to payment**.
 3. You'll see an exact amount such as `5.001721 USDC` — the last digits identify your payment.
    Pay it one of two ways:
    - **Pay with browser wallet** (MetaMask, Rabby…): GrowTendril adds Celo to your wallet if needed and
@@ -63,12 +63,12 @@ Everything here can be changed later in **Settings**.
 
 ## 4. Run your first scan
 
-1. On **Overview**, click **Run cycle · 1 USDC** (or **Run agent** in the top bar).
+1. On **Overview**, click **Scan for customers · 0.5 USDC** (also in the top bar).
 2. The operator reads your sources (Reddit, Bluesky, Hacker News, YouTube, GitHub for developer
    products, plus X and RSS if configured), scores what it finds and updates your plan. Watch it in
-   **Agent runs** — a scan usually takes under a minute.
+   **Scan history** — a scan usually takes under a minute.
 3. Want it to run on its own? Set **Autopilot** (top bar) to daily, every 6 hours or hourly — each run
-   is one 1 USDC scan, and autopilot simply waits if your credit runs out.
+   is one 0.5 USDC scan, and autopilot simply waits if your credit runs out.
 
 ## 5. Read what it found
 
@@ -176,7 +176,7 @@ can't be withdrawn until it finishes.
 
 | I want to… | Go to |
 |---|---|
-| Add credit | **Billing → Pay on Celo** |
+| Add credit | **Billing → Continue to payment** |
 | Run a scan now | **Overview → Run cycle** |
 | Run scans automatically | **Autopilot** (top bar) |
 | Fund payments to creators | **Wallet** → copy address → send Celo USDC |

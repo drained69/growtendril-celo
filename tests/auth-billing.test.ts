@@ -119,7 +119,7 @@ describe("prepaid credit in USDC on Celo", () => {
   it("accepts top-ups from the minimum, in cents", () => {
     expect(billing.parseTopUp("1")).toBe(usdc(1));
     expect(billing.parseTopUp(12.5)).toBe(12_500_000);
-    expect(() => billing.parseTopUp("0.99")).toThrow(/at least 1 USDC/);
+    expect(() => billing.parseTopUp("0.49")).toThrow(/at least 0.5 USDC/);
     expect(() => billing.parseTopUp("5.001")).toThrow(/two decimal/);
     // Cent amounts that float math gets wrong (19.99 × 100 = 1998.9999…) are valid.
     for (const v of ["19.99", "20.01", "4.35", "1,000.29", "7.50", "3.000"]) expect(() => billing.parseTopUp(v)).not.toThrow();
@@ -184,13 +184,13 @@ describe("prepaid credit in USDC on Celo", () => {
 
   it("charges each service its fixed price once, never overdraws, and refunds failures", async () => {
     process.env.BILLING_CELO_ADDRESS = PAY_TO;
-    await billing.addCredit(db, { userId: "u2", amountMicro: usdc(2.5), ref: "test-topup-u2" });
-    expect(await billing.balanceMicro(db, "u2")).toBe(usdc(2.5));
-    expect(await billing.chargeService(db, { ownerId: "u2", projectId: "p1", service: "scan", ref: "job:a" })).toEqual({ charged: true, balanceMicro: usdc(1.5) });
+    await billing.addCredit(db, { userId: "u2", amountMicro: usdc(1.25), ref: "test-topup-u2" });
+    expect(await billing.balanceMicro(db, "u2")).toBe(usdc(1.25));
+    expect(await billing.chargeService(db, { ownerId: "u2", projectId: "p1", service: "scan", ref: "job:a" })).toEqual({ charged: true, balanceMicro: usdc(0.75) });
     // The same ref (a retried request) is charged once.
     expect((await billing.chargeService(db, { ownerId: "u2", service: "scan", ref: "job:a" })).charged).toBe(false);
-    expect(await billing.balanceMicro(db, "u2")).toBe(usdc(1.5));
-    // Two services started together can't both spend the last 1.5 USDC.
+    expect(await billing.balanceMicro(db, "u2")).toBe(usdc(0.75));
+    // Two services started together can't both spend the last 0.75 USDC.
     const both = await Promise.allSettled([
       billing.chargeService(db, { ownerId: "u2", service: "creator_report", ref: "r:1" }),
       billing.chargeService(db, { ownerId: "u2", service: "creator_report", ref: "r:2" }),
@@ -204,7 +204,7 @@ describe("prepaid credit in USDC on Celo", () => {
     expect(await billing.refundCharge(db, "job:a")).toBe(true);
     expect(await billing.refundCharge(db, "job:a")).toBe(false);
     expect(await billing.refundCharge(db, "never-charged")).toBe(false);
-    expect(await billing.balanceMicro(db, "u2")).toBe(usdc(1));
+    expect(await billing.balanceMicro(db, "u2")).toBe(usdc(0.5));
     const kinds = (await billing.ledgerFor(db, "u2")).map((l) => l.kind).sort();
     expect(kinds).toEqual(["charge", "charge", "refund", "topup"]);
   });

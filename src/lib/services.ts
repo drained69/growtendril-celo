@@ -8,19 +8,19 @@ export type ServiceKey = "scan" | "creator_report" | "campaign_brief";
 export const SERVICES: Record<ServiceKey, { name: string; priceUsdc: number; unit: string; blurb: string }> = {
   scan: {
     name: "Scan for customers",
-    priceUsdc: 1,
+    priceUsdc: 0.5,
     unit: "per scan",
     blurb: "Reads the places your customers talk, scores the people, trends and creators it finds, updates your growth plan and suggests tests. Each Autopilot run is one scan.",
   },
   creator_report: {
     name: "Creator report",
-    priceUsdc: 1.5,
+    priceUsdc: 0.75,
     unit: "per refresh",
     blurb: "Finds new creators, reads their profiles and rebuilds the report with how to reach them and a first message.",
   },
   campaign_brief: {
     name: "Campaign brief",
-    priceUsdc: 1,
+    priceUsdc: 0.5,
     unit: "per rewrite",
     blurb: "A fresh campaign brief for one creator. The first draft for every creator is free.",
   },
@@ -39,6 +39,6 @@ export function autopilotCostLabel(cadence: string): string {
 }
 
 /** Top-ups: any amount from the minimum; the presets are just shortcuts. */
-export const MIN_TOPUP_USDC = 1;
+export const MIN_TOPUP_USDC = 0.5;
 export const MAX_TOPUP_USDC = 10_000;
 export const TOPUP_PRESETS_USDC = [5, 10, 25, 50];

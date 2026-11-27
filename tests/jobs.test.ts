@@ -140,7 +140,7 @@ describe("scan credit after worker interruption", () => {
       const first = await q.claimNext(db, "billing-worker");
       expect(first?.id).toBe(queued?.id);
       await billing.chargeService(db, { ownerId: "billing-owner", projectId: "billing-project", service: "scan", ref: `job:${queued!.id}:1` });
-      expect(await billing.balanceMicro(db, "billing-owner")).toBe(3_000_000);
+      expect(await billing.balanceMicro(db, "billing-owner")).toBe(3_500_000);
       await db.update(s.jobs).set({ lockedUntil: new Date(Date.now() - 1_000) }).where(eq(s.jobs.id, queued!.id));
       const retry = await q.claimNext(db, "billing-worker-2");
       expect(retry?.id).toBe(queued?.id);

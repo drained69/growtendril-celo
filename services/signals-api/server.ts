@@ -13,7 +13,7 @@ const PORT = Number(process.env.SIGNALS_API_PORT || process.env.PORT || 4021);
 const SELLER = process.env.SIGNALS_SELLER_ADDRESS;
 const app = express();
 app.disable("x-powered-by");
-const PRICES = {company: "5000", creator: "10000", narrative: "2500"};
+const PRICES = {company: "2500", creator: "5000", narrative: "1250"};
 app.get("/", (_req, res) => res.json({name: "GrowTendril Signals", network: CELO.caip2,
   identity: "Self Agent ID required before payment", seller: SELLER ?? null,
   configured: !!SELLER && !!process.env.X402_API_KEY,

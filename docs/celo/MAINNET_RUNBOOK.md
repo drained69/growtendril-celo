@@ -12,7 +12,7 @@ Submission closes **December 7, 2026 at 09:00 GMT**. Aim to finish step 11 by De
 npm run celo:env:push
 ```
 
-**Ask the organizers about eligibility.** The rules say code is written during the hackathon, from November 20, and GrowTendril existed before that. Tell them what was imported and what was built for Celo, and get their answer in writing. `docs/celo/import-manifest.json` lists the imported files.
+**Ask the organizers about eligibility.** The rules say code is written during the hackathon, from November 20, and GrowTendril existed before that. Tell them what was imported and what was built for Celo, and get their answer in writing.
 
 **Contract review.** The contracts have had a manual review, invariant fuzzing and a partial automated audit, with every candidate finding checked and the valid ones fixed. [Validation](VALIDATION.md) has the details. The contracts cannot be upgraded after deployment, so any further change must happen before step 5, followed by a rerun of step 3.
 

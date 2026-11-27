@@ -7,7 +7,7 @@ import { z } from "zod";
 import { getDb, schema as s } from "@/server/db/client";
 import { audit } from "@/server/db/helpers";
 import { currentUser } from "@/server/auth/current";
-import { addCredit, billingMode, checkInvoice, createInvoice, parseTopUp, payInvoiceWithTx, payToAddress } from "@/server/domain/billing";
+import { addCredit, billingMode, checkInvoice, createInvoice, InvoiceTxError, parseTopUp, payInvoiceWithTx, payToAddress } from "@/server/domain/billing";
 import { newId } from "@/server/lib/ids";
 import { fmtUsdc, microToDecimal } from "@/lib/money";
 import { appOrigin } from "@/server/lib/origin";
@@ -85,7 +85,7 @@ export async function payWalletInvoiceAction(invoiceId: string, code: string): P
       } catch (e) {
         // The receipt can precede RPC transaction indexing. Keep watching the exact invoice;
         // no second transfer is allowed, and the background matcher will add credit on arrival.
-        if (!(e instanceof Error) || !e.message.includes("can't find a successful transaction")) throw e;
+        if (!(e instanceof InvoiceTxError) || e.state !== "pending") throw e;
       }
     }
     await audit(db, { actorType: "user", actorId: user.id, action: "billing.wallet_payment", target: inv.id, data: { projectId: project.id, txHash: sent.txHash, state: sent.state } });
@@ -139,6 +139,31 @@ export async function payWithTxAction(invoiceId: string, _: unknown, form: FormD
     await audit(db, { actorType: "user", actorId: user.id, action: "billing.paid", target: inv.id, data: { txHash } });
     revalidatePath("/", "layout");
     return { ok: true, message: "Payment confirmed on Celo" };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * The payment page's check on a transaction it just sent. "pending" keeps watching; "failed" means
+ * that transaction will never pay this invoice (it reverted, or paid the wrong amount or address).
+ */
+export async function checkSentPaymentAction(invoiceId: string, txHash: string): Promise<ActionResult<{ state: "paid" | "pending" | "failed" }>> {
+  try {
+    // Polled every few seconds while a payment confirms, so it gets the same allowance as invoice checks.
+    await limited("invoice-sent", 30, 0.5);
+    const user = await verifiedUser();
+    const hash = TxForm.parse({ txHash }).txHash;
+    const { db, inv } = await ownInvoice(invoiceId, user.id);
+    try {
+      await payInvoiceWithTx(db, inv, hash, await appOrigin());
+    } catch (e) {
+      if (!(e instanceof InvoiceTxError)) throw e;
+      return { ok: true, data: { state: e.state === "pending" ? "pending" : "failed" }, message: e.message };
+    }
+    await audit(db, { actorType: "user", actorId: user.id, action: "billing.paid", target: inv.id, data: { txHash: hash } });
+    revalidatePath("/", "layout");
+    return { ok: true, data: { state: "paid" }, message: "Payment confirmed on Celo" };
   } catch (e) {
     return fail(e);
   }

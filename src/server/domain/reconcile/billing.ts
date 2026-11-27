@@ -36,7 +36,8 @@ export async function reconcileBillingPayments(db: DB, opts: { maxBlocks?: bigin
   const to = latest < from + max - 1n ? latest : from + max - 1n;
   if (to < from) return { scanned: 0, opened: 0 };
 
-  const hits = await transfersTo(payTo, from, to);
+  // The billing address sending USDC to itself is not money arriving from anyone.
+  const hits = (await transfersTo(payTo, from, to)).filter((h) => h.from.toLowerCase() !== payTo.toLowerCase());
   const byHash = new Map<string, { from: string; amountMicro: number; block: bigint }>();
   for (const h of hits) {
     const k = h.txHash.toLowerCase();

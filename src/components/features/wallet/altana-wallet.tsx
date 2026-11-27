@@ -9,37 +9,10 @@ import { Checkbox, Field, Input, Select } from "@/components/ui/form";
 import { toast } from "@/components/ui/toast";
 import { useHydrated } from "@/components/ui/submit";
 import { activateAltanaSessionAction, confirmAltanaRevokeAction, prepareAltanaSessionAction, saveAltanaWalletAction } from "@/server/actions/celo-rails";
-import { celoReader } from "@/lib/celo-browser";
-import { recoverPasskeyForWallet } from "@/lib/passkey-recovery";
+import { altana, ownerFor } from "@/lib/altana-owner";
 
 export interface AltanaSessionView { id: string; publicKey: string; capUsd: string; period: string; expiresAt: string; grantTxHash: string | null; revokeTxHash: string | null }
 const TOKENS = [["cNGN", "Naira"], ["IDRX", "Rupiah"], ["wBRL", "Real"], ["wARS", "Argentine peso"], ["wMXN", "Mexican peso"], ["wCOP", "Colombian peso"]] as const;
-
-async function altana() {
-  const sdk = await import("@altananetwork/sdk");
-  return { sdk, client: sdk.createClient({ chains: [sdk.CELO], agentIdentity: { name: "GrowTendril Growth Operator", description: "Pays creators under limits its owner sets onchain.", endpoint: window.location.origin } }) };
-}
-/**
- * The owner's passkey signer. Altana's registry learns a wallet's passkey only on its first
- * transaction, so a wallet that has never transacted rebuilds the passkey from its signatures.
- */
-async function ownerFor(address: string) {
-  const { sdk, client } = await altana();
-  const fromSignatures = async () => {
-    const { id, publicKey } = await recoverPasskeyForWallet(address);
-    return { address, signer: sdk.signerFromPasskey({ kind: "webauthn", id, publicKey }) };
-  };
-  const code = await celoReader.getCode({ address: address as Address });
-  if (!code || code === "0x") return { sdk, client, owner: await fromSignatures() };
-  try {
-    const owner = await client.recoverFromPasskey();
-    if (owner.address.toLowerCase() !== address.toLowerCase()) throw new Error("This passkey belongs to a different wallet.");
-    return { sdk, client, owner };
-  } catch (e) {
-    if (e instanceof Error && e.message.includes("no keys registered")) return { sdk, client, owner: await fromSignatures() };
-    throw e;
-  }
-}
 
 export function AltanaWallet({ address, session, canManage, workspaceName }: { address: string | null; session: AltanaSessionView | null; canManage: boolean; workspaceName: string }) {
   const [capUsd, setCapUsd] = useState("25");

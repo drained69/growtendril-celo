@@ -7,7 +7,7 @@ import { fmtUsdc, microToDecimal, toMicro } from "@/lib/money";
 import { sendEmail } from "@/server/integrations/email";
 import { txExplorerUrl } from "@/server/integrations/celo/config";
 import { MAX_TOPUP_USDC, MIN_TOPUP_USDC, SERVICES, servicePriceMicro, type ServiceKey } from "@/lib/services";
-import { currentBlock, isAddress, isTxHash, paymentInTx, transfersTo } from "@/server/domain/billing/celo";
+import { currentBlock, isAddress, isTxHash, paymentInTx, transfersTo, txOutcome } from "@/server/domain/billing/celo";
 import { resolveByRef } from "@/server/domain/reconcile/exceptions";
 
 /**
@@ -41,6 +41,16 @@ export function billingMode(): BillingMode {
 /** "Label · 1 USDC" while billing is on, so paid buttons say what they cost. */
 export function priced(label: string, service: ServiceKey): string {
   return billingMode() === "off" ? label : `${label} · ${SERVICES[service].priceUsdc} USDC`;
+}
+
+/**
+ * Why a transaction hash didn't pay an invoice. "pending": Celo hasn't mined it yet, so check again.
+ * "final": it never will (it failed, or it can't pay this invoice), so stop waiting for it.
+ */
+export class InvoiceTxError extends Error {
+  constructor(readonly state: "pending" | "final", message: string) {
+    super(message);
+  }
 }
 
 export class InsufficientCredit extends Error {
@@ -229,7 +239,8 @@ async function settle(db: DB, inv: Invoice, p: { txHash: string; from: string; a
 export async function checkInvoice(db: DB, inv: Invoice, appUrl?: string): Promise<{ paid: boolean }> {
   if (inv.status === "paid") return { paid: true };
   if (inv.status !== "pending") return { paid: false };
-  const transfers = await transfersTo(inv.payTo, BigInt(inv.fromBlock));
+  // USDC the billing address sends to itself never left it, so it pays nothing.
+  const transfers = (await transfersTo(inv.payTo, BigInt(inv.fromBlock))).filter((t) => t.from.toLowerCase() !== inv.payTo.toLowerCase());
   // A transaction may emit several transfers to us. Its hash is claimed once, so use the
   // full received amount instead of crediting one log and losing the rest of that payment.
   const grouped = new Map<string, (typeof transfers)[number]>();
@@ -257,16 +268,20 @@ export async function checkInvoice(db: DB, inv: Invoice, appUrl?: string): Promi
  * invoice too, so a slow payer isn't stranded.
  */
 export async function payInvoiceWithTx(db: DB, inv: Invoice, txHash: string, appUrl?: string, expectedFrom?: string): Promise<{ paid: boolean }> {
-  if (!isTxHash(txHash)) throw new Error("That doesn't look like a transaction hash (0x followed by 64 characters).");
+  if (!isTxHash(txHash)) throw new InvoiceTxError("final", "That doesn't look like a transaction hash (0x followed by 64 characters).");
   if (inv.status === "paid") return { paid: true };
   const p = await paymentInTx(txHash, inv.payTo);
-  if (!p) throw new Error("We can't find a successful transaction with that hash on Celo yet. If you just sent it, wait a few seconds and try again.");
-  if (expectedFrom && p.from.toLowerCase() !== expectedFrom.toLowerCase()) throw new Error("The Celo payment did not come from this workspace wallet.");
+  if (!p) {
+    if ((await txOutcome(txHash)) === "reverted") throw new InvoiceTxError("final", "That payment failed on Celo, so no USDC moved. Only the network fee was spent. The usual cause is not enough USDC in the sending wallet. Add USDC and pay again.");
+    throw new InvoiceTxError("pending", "We can't find a successful transaction with that hash on Celo yet. If you just sent it, wait a few seconds and try again.");
+  }
+  if (expectedFrom && p.from.toLowerCase() !== expectedFrom.toLowerCase()) throw new InvoiceTxError("final", "The Celo payment did not come from this workspace wallet.");
   const [used] = await db.select({ id: s.billingInvoices.id }).from(s.billingInvoices).where(eq(s.billingInvoices.txHash, txHash.toLowerCase()));
-  if (used && used.id !== inv.id) throw new Error("That transaction has already paid another invoice.");
-  if (p.blockNumber < BigInt(inv.fromBlock)) throw new Error("That transaction happened before this invoice was created, so it can't pay it.");
+  if (used && used.id !== inv.id) throw new InvoiceTxError("final", "That transaction has already paid another invoice.");
+  if (p.blockNumber < BigInt(inv.fromBlock)) throw new InvoiceTxError("final", "That transaction happened before this invoice was created, so it can't pay it.");
+  if (p.amountMicro === 0 && p.from.toLowerCase() === inv.payTo.toLowerCase()) throw new InvoiceTxError("final", "That transaction came from GrowTendril's billing address itself, so no money arrived. Pay from a different wallet.");
   if (p.amountMicro < inv.priceMicro) {
-    throw new Error(p.amountMicro === 0 ? `That transaction didn't send USDC to ${inv.payTo}.` : `That transaction sent ${fmtUsdc(p.amountMicro)}; this top-up is ${fmtUsdc(inv.priceMicro)}.`);
+    throw new InvoiceTxError("final", p.amountMicro === 0 ? `That transaction didn't send USDC to ${inv.payTo}.` : `That transaction sent ${fmtUsdc(p.amountMicro)}; this top-up is ${fmtUsdc(inv.priceMicro)}.`);
   }
   // A payment of another person's exact invoice amount is theirs, even if it hasn't been matched yet:
   // without this, anyone who saw the hash could paste it into their own invoice and take the credit.
@@ -276,7 +291,7 @@ export async function payInvoiceWithTx(db: DB, inv: Invoice, txHash: string, app
       .from(s.billingInvoices)
       .where(and(eq(s.billingInvoices.payTo, inv.payTo), eq(s.billingInvoices.amountMicro, p.amountMicro), inArray(s.billingInvoices.status, ["pending", "expired"]), sql`${s.billingInvoices.userId} <> ${inv.userId}`, gt(s.billingInvoices.createdAt, new Date(Date.now() - 7 * 86_400_000))))
       .limit(1);
-    if (owner) throw new Error("That transaction matches another top-up request. If it's yours, open that request from Billing and check the transaction there.");
+    if (owner) throw new InvoiceTxError("final", "That transaction matches another top-up request. If it's yours, open that request from Billing and check the transaction there.");
   }
   await settle(db, inv, { txHash, from: p.from, amountMicro: p.amountMicro }, appUrl);
   return { paid: true };

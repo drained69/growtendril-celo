@@ -89,14 +89,26 @@ export async function payoutInTx(hash: string, from: string, to: string): Promis
   return { status: "success", toRecipientMicro: Number(toRecipient), elsewhere: [...elsewhere].map(([addr, v]) => ({ to: addr, amountMicro: Number(v) })), blockNumber: receipt.blockNumber };
 }
 
-/** What a transaction paid to `to`, in micro-USDC. Null if the transaction failed or isn't mined yet. */
+/**
+ * What a transaction paid to `to`, in micro-USDC. Null if the transaction failed or isn't mined yet.
+ * USDC that `to` sends to itself is not a payment. `from` is the account the USDC left, which for a
+ * smart wallet paying through a relay differs from the transaction's sender.
+ */
 export async function paymentInTx(hash: string, to: string): Promise<{ amountMicro: number; from: string; blockNumber: bigint } | null> {
   await assertCeloMainnet();
   const [receipt, tx] = await Promise.all([rpc().getTransactionReceipt({ hash: hash as Hash }).catch(() => null), rpc().getTransaction({ hash: hash as Hash }).catch(() => null)]);
   if (!receipt || !tx || receipt.status !== "success") return null;
   const target = to.toLowerCase();
-  const micro = movesIn(receipt.logs, tx)
-    .filter((m) => m.to === target)
-    .reduce((n, m) => n + m.micro, 0n);
-  return { amountMicro: Number(micro), from: tx.from, blockNumber: receipt.blockNumber };
+  const incoming = movesIn(receipt.logs, tx).filter((m) => m.to === target && m.from !== target);
+  const micro = incoming.reduce((n, m) => n + m.micro, 0n);
+  const senders = [...new Set(incoming.map((m) => m.from))];
+  return { amountMicro: Number(micro), from: senders.length === 1 ? senders[0]! : tx.from, blockNumber: receipt.blockNumber };
+}
+
+/** Whether a transaction is mined, and whether it succeeded. A failed transaction moved no tokens. */
+export async function txOutcome(hash: string): Promise<"pending" | "reverted" | "success"> {
+  await assertCeloMainnet();
+  const receipt = await rpc().getTransactionReceipt({ hash: hash as Hash }).catch(() => null);
+  if (!receipt) return "pending";
+  return receipt.status === "success" ? "success" : "reverted";
 }

@@ -4,13 +4,18 @@ import type { DB } from "@/server/db/client";
 process.env.PGLITE_DIR = "memory://";
 const PAY_TO = "0x1111111111111111111111111111111111111111";
 process.env.BILLING_CELO_ADDRESS = PAY_TO;
-const chain = vi.hoisted(() => ({ payment: null as null | { from: string; amountMicro: number; blockNumber: bigint } }));
+const chain = vi.hoisted(() => ({
+  payment: null as null | { from: string; amountMicro: number; blockNumber: bigint },
+  outcome: "pending" as "pending" | "reverted" | "success",
+  transfers: [] as { txHash: string; from: string; amountMicro: number; blockNumber: bigint }[],
+}));
 vi.mock("@/server/integrations/email", () => ({ sendEmail: vi.fn(async () => undefined) }));
 vi.mock("@/server/domain/billing/celo", async (original) => ({
   ...(await original<typeof import("@/server/domain/billing/celo")>()),
   currentBlock: async () => 1000n,
-  transfersTo: async () => [],
+  transfersTo: async () => chain.transfers,
   paymentInTx: async () => chain.payment,
+  txOutcome: async () => chain.outcome,
 }));
 
 let db: DB;
@@ -18,6 +23,8 @@ let billing: typeof import("@/server/domain/billing");
 const HASH_A = `0x${"a".repeat(64)}`;
 const HASH_C = `0x${"c".repeat(64)}`;
 const HASH_D = `0x${"d".repeat(64)}`;
+const HASH_E = `0x${"e".repeat(64)}`;
+const HASH_F = `0x${"f".repeat(64)}`;
 
 beforeAll(async () => {
   const client = await import("@/server/db/client");
@@ -61,5 +68,28 @@ describe("claiming a top-up by transaction hash", () => {
     expect(paid.status).toBe("paid");
     expect(paid.payer?.toLowerCase()).toBe(wallet.toLowerCase());
     expect(await billing.balanceMicro(db, "alice")).toBe(before + invoice.amountMicro);
+  });
+
+  it("tells the payer a reverted payment failed, instead of waiting for it forever", async () => {
+    const invoice = await billing.createInvoice(db, "bob", 1_000_000, { block: 900n });
+    chain.payment = null;
+    chain.outcome = "pending";
+    await expect(billing.payInvoiceWithTx(db, invoice, HASH_E)).rejects.toMatchObject({ state: "pending" });
+    chain.outcome = "reverted";
+    await expect(billing.payInvoiceWithTx(db, invoice, HASH_E)).rejects.toMatchObject({ state: "final", message: expect.stringMatching(/failed on Celo, so no USDC moved/) });
+    const [open] = (await billing.invoicesFor(db, "bob")).filter((i) => i.id === invoice.id);
+    expect(open.status).toBe("pending");
+  });
+
+  it("never credits USDC the billing address sends to itself", async () => {
+    const invoice = await billing.createInvoice(db, "bob", 3_000_000, { block: 900n });
+    const before = await billing.balanceMicro(db, "bob");
+    // paymentInTx leaves out self-transfers, so the billing address shows as the sender of nothing.
+    chain.payment = { from: PAY_TO, amountMicro: 0, blockNumber: 960n };
+    await expect(billing.payInvoiceWithTx(db, invoice, HASH_F)).rejects.toMatchObject({ state: "final", message: expect.stringMatching(/billing address itself/) });
+    chain.transfers = [{ txHash: HASH_F, from: PAY_TO, amountMicro: invoice.amountMicro, blockNumber: 960n }];
+    await expect(billing.checkInvoice(db, invoice)).resolves.toEqual({ paid: false });
+    chain.transfers = [];
+    expect(await billing.balanceMicro(db, "bob")).toBe(before);
   });
 });

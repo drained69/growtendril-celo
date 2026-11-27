@@ -25,6 +25,7 @@ import { TopUpButton } from "@/components/features/billing/top-up";
 import { withdrawable } from "@/server/domain/agent/withdraw";
 import { SERVICES, servicePriceMicro } from "@/lib/services";
 import { getWallet, walletIsLive } from "@/server/integrations/celo/wallets";
+import { celoUsdcBalanceMicro } from "@/server/integrations/celo/wallet-balance";
 
 export const dynamic = "force-dynamic";
 
@@ -44,11 +45,16 @@ export default async function PayInvoicePage({ params }: { params: Promise<{ id:
   const selected = await currentProject(user.id);
   const walletOwner = selected?.project.ownerId === user.id && !expired && inv.status === "pending";
   const workspaceWallet = walletOwner ? await getWallet(db, selected.project.id) : null;
-  const walletFunds = walletOwner && workspaceWallet && walletIsLive(workspaceWallet) && !workspaceWallet.frozen
-    ? await withdrawable(db, selected.project.id).catch(() => null) : null;
-  const walletUnavailable = walletOwner && !walletFunds
-    ? workspaceWallet?.frozen ? "Payments from this workspace are paused. Turn them back on from the Payout account page to pay this way." : walletIsLive(workspaceWallet) ? "We couldn't read your Payout account balance just now. Refresh this page to try again." : "Set up a Payout account first to pay from it."
+  // GrowTendril can move money only from a wallet it signs for. The owner signs for an Altana
+  // wallet with their passkey, and for a workspace contract with their own wallet.
+  const serverSigned = !!workspaceWallet && workspaceWallet.provider !== "altana" && workspaceWallet.provider !== "growth_vault";
+  const walletFunds = serverSigned && walletIsLive(workspaceWallet) && !workspaceWallet!.frozen
+    ? await withdrawable(db, selected!.project.id).catch(() => null) : null;
+  const walletUnavailable = serverSigned && !walletFunds
+    ? workspaceWallet!.frozen ? "Payments from this workspace are paused. Turn them back on from the Payout account page to pay this way." : walletIsLive(workspaceWallet) ? "We couldn't read your Payout account balance just now. Refresh this page to try again." : null
     : null;
+  const altanaPayer = workspaceWallet?.provider === "altana" && workspaceWallet.address
+    ? { address: workspaceWallet.address, balanceMicro: await celoUsdcBalanceMicro(workspaceWallet.address).catch(() => null) } : null;
 
   return (
     <div className="min-h-screen bg-bg">
@@ -129,13 +135,13 @@ export default async function PayInvoicePage({ params }: { params: Promise<{ id:
                   { k: "Money", v: "USDC (digital dollars)" },
                 ]}
               />
-              <Callout tone="info">Send on the Celo network only. USDC sent on another network can&apos;t be matched to your top-up. Sending costs a tiny network fee (usually under a cent), so keep a little more than this amount in your wallet.</Callout>
+              <Callout tone="info">Send on the Celo network only. USDC sent on another network can&apos;t be matched to your top-up. Sending also costs a tiny network fee, usually under a cent. MiniPay takes it from your USDC; other wallets need a few cents of CELO.</Callout>
               <UsdcHelp compact />
               <details className="text-[12px] text-ink-3"><summary className="cursor-pointer">Technical details</summary><p className="mt-2">Celo Mainnet, chain {CELO.chainId}. USDC token contract <span className="num break-all">{CELO.usdc}</span>.</p></details>
               {scheduled.length > 0 && <Callout tone="warn" title="Autopilot may use this credit straight away">{scheduled.map((p) => p.name).join(", ")} {scheduled.length === 1 ? "has" : "have"} Autopilot on. A scan that is due can take {SERVICES.scan.priceUsdc} USDC of your credit as soon as this payment arrives. <Link href="/app/settings#autopilot" className="underline">Change Autopilot</Link> first if you would rather start the scan yourself.</Callout>}
               {walletFunds && <PayWorkspaceWallet invoiceId={inv.id} amountMicro={inv.amountMicro} availableMicro={walletFunds.availableMicro} balanceMicro={walletFunds.balanceMicro} />}
               {walletUnavailable && <Callout tone="warn">{walletUnavailable}</Callout>}
-              <PayInvoice attributionCode={process.env.CELO_ATTRIBUTION_CODE ?? null} invoiceId={inv.id} payTo={inv.payTo} amountMicro={inv.amountMicro} usdc={CELO.usdc} chainId={CELO.chainId} rpcUrl={CELO.publicRpcUrl} explorer={CELO.explorer} next={paymentNext} />
+              <PayInvoice attributionCode={process.env.CELO_ATTRIBUTION_CODE ?? null} invoiceId={inv.id} payTo={inv.payTo} amountMicro={inv.amountMicro} usdc={CELO.usdc} chainId={CELO.chainId} rpcUrl={CELO.publicRpcUrl} explorer={CELO.explorer} next={paymentNext} altana={altanaPayer} />
             </CardBody>
           </Card>
         )}

@@ -38,8 +38,8 @@ export function PayWorkspaceWallet({ invoiceId, amountMicro, availableMicro, bal
       <p className="text-[12px] leading-relaxed text-ink-3">
         Move exactly {fmtUsdc(amountMicro)} from this workspace&apos;s Payout account into credit. We email you a code to confirm it, and the credit appears once the payment arrives.
       </p>
-      <p className="text-[12px] text-ink-2">Payout account: <span className="num">{fmtUsdc(balanceMicro)}</span> · Available after the fee reserve: <span className="num">{fmtUsdc(availableMicro)}</span></p>
-      {!enough && <Callout tone="warn">Add at least {fmtUsdc(amountMicro - availableMicro)} to your Payout account, or pay from another wallet below. It keeps 0.05 USDC back for network fees.</Callout>}
+      <p className="text-[12px] text-ink-2">Payout account: <span className="num">{fmtUsdc(balanceMicro)}</span>{availableMicro < balanceMicro && <> · Free to use: <span className="num">{fmtUsdc(availableMicro)}</span> (the rest is set aside for payments in progress)</>}</p>
+      {!enough && <Callout tone="warn">Add at least {fmtUsdc(amountMicro - availableMicro)} to your Payout account, or pay from another wallet below.</Callout>}
       {error && <Callout tone="danger">{error}</Callout>}
       {message && <Callout tone="info">{message}</Callout>}
       {!sent && !codeSent && <Button type="button" variant="secondary" icon={<Mail />} loading={busy} disabled={!enough} onClick={requestCode}>Email me a payment code</Button>}

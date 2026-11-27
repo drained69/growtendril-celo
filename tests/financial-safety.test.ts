@@ -27,6 +27,8 @@ let attribution: typeof import("@/server/domain/growth/attribution");
 let decisions: typeof import("@/server/domain/agent/decisions");
 const micro = (n: number) => n * 1_000_000;
 const ADDRESS = "0x1111111111111111111111111111111111111111";
+// Someone paying the billing address. USDC the billing address sends itself is never a payment.
+const PAYER = "0x5555555555555555555555555555555555555555";
 let number = 0;
 
 beforeAll(async () => {
@@ -58,7 +60,7 @@ describe("financial safety regressions", () => {
     process.env.BILLING_CELO_ADDRESS = ADDRESS;
     const inv = await billing.createInvoice(db, "u", micro(5), { block: 10n });
     expect(inv.fromBlock).toBe("0");
-    external.incoming = [{ txHash: `0x${"9".repeat(64)}`, from: ADDRESS, amountMicro: inv.amountMicro, blockNumber: 11n }];
+    external.incoming = [{ txHash: `0x${"9".repeat(64)}`, from: PAYER, amountMicro: inv.amountMicro, blockNumber: 11n }];
     await db.execute(sql`create function test_credit_failure() returns trigger language plpgsql as $$ begin raise exception 'injected credit failure'; end $$`);
     await db.execute(sql`create trigger test_credit_failure before insert on credit_ledger for each row execute function test_credit_failure()`);
     try { await expect(billing.checkInvoice(db, inv)).rejects.toThrow(); }
@@ -82,7 +84,7 @@ describe("financial safety regressions", () => {
     const inv = await billing.createInvoice(db, "u", micro(7));
     const before = await billing.balanceMicro(db, "u");
     const hash = `0x${"8".repeat(64)}`;
-    external.incoming = [{ txHash: hash, from: ADDRESS, amountMicro: micro(3), blockNumber: 1001n }, { txHash: hash, from: ADDRESS, amountMicro: inv.amountMicro - micro(3), blockNumber: 1001n }];
+    external.incoming = [{ txHash: hash, from: PAYER, amountMicro: micro(3), blockNumber: 1001n }, { txHash: hash, from: PAYER, amountMicro: inv.amountMicro - micro(3), blockNumber: 1001n }];
     expect(await billing.checkInvoice(db, inv)).toEqual({ paid: true });
     expect(await billing.balanceMicro(db, "u")).toBe(before + inv.amountMicro);
   });

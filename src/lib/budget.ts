@@ -25,7 +25,9 @@ export const RESEARCH_TYPES = ["research", "services"] as const;
 /** The largest single payment for a monthly budget: a quarter of it, at most $50, at least $1. */
 export function defaultLargestPaymentMicro(monthlyMicro: number): number {
   const quarter = Math.floor(Math.max(0, monthlyMicro) / 4 / 10_000) * 10_000;
-  return Math.min(toMicroUsdc(DEFAULT_MAX_SINGLE_PAYMENT_USDC), Math.max(toMicroUsdc(1), quarter));
+  const largest = Math.min(toMicroUsdc(DEFAULT_MAX_SINGLE_PAYMENT_USDC), Math.max(toMicroUsdc(1), quarter));
+  // A budget under $1 can't pay more than itself in one go.
+  return monthlyMicro > 0 ? Math.min(largest, Math.floor(monthlyMicro)) : largest;
 }
 
 export interface BudgetChoice {

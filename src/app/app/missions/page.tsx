@@ -30,22 +30,22 @@ export default async function Missions() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Missions"
-        description="A mission is a goal, a timeframe and a budget. Results are counted from conversion events, never estimated."
+        title="Goal"
+        description="What you want more of, with a monthly budget that starts again every 30 days. Results are counted, never estimated."
         meta={
           <>
             <ModeBadge mode={project.dataMode} />
             <span>
-              {missions.length} mission{missions.length === 1 ? "" : "s"}
+              {missions.length} month{missions.length === 1 ? "" : "s"} so far
             </span>
           </>
         }
         actions={
           <>
-            {operate && hasActive && <ActionButton action={runLearningAction} label="Run learning" icon={<Brain />} logTitle="Learning run" />}
+            {operate && hasActive && <ActionButton action={runLearningAction} label="Compare results" icon={<Brain />} logTitle="Compare results" />}
             {operate && (
               <LinkButton href="/onboarding?step=3" icon={<Plus />} variant="primary">
-                New mission
+                New goal
               </LinkButton>
             )}
           </>
@@ -55,9 +55,9 @@ export default async function Missions() {
       {!missions.length && (
         <EmptyState
           icon={<Flag />}
-          title="No missions yet"
-          description="A mission gives the operator a measurable goal and a USDC budget ceiling. Nothing is spent without one."
-          action={operate ? <LinkButton href="/onboarding?step=3" variant="primary" icon={<Plus />}>Create mission</LinkButton> : undefined}
+          title="No goal yet"
+          description="Set what you want more of and a monthly budget. Nothing is spent without one."
+          action={operate ? <LinkButton href="/onboarding?step=3" variant="primary" icon={<Plus />}>Set a goal</LinkButton> : undefined}
         />
       )}
 
@@ -73,7 +73,7 @@ export default async function Missions() {
               action={
                 <>
                   <ModeBadge mode={m.dataMode} />
-                  <StatusBadge status={m.status} />
+                  <StatusBadge status={m.status} label={m.status === "active" ? "This month" : m.status === "closing" ? "Finishing its tests" : m.status === "completed" ? "Done" : undefined} />
                   <span className="num hidden text-[11.5px] text-ink-3 sm:inline">
                     {isoDate(m.startsAt)} → {isoDate(m.endsAt)}
                   </span>
@@ -92,56 +92,53 @@ export default async function Missions() {
                   </div>
                   <div className="text-right text-[11.5px] text-ink-3">
                     <div className="num text-[13px] text-ink">{pct}%</div>
-                    {m.status === "active" ? `${sum.daysLeft}d left · on-pace ${Math.round(sum.pace)}` : "final"}
+                    {m.status === "active" ? `${sum.daysLeft} days until it resets · on pace for ${Math.round(sum.pace)}` : "final"}
                   </div>
                 </div>
                 <GoalProgress achieved={sum.achieved} goal={m.goalTarget} pace={m.status === "active" ? sum.pace : undefined} />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
-                  <Stat size="sm" label="Attributed" value={sum.attributed} sub="to experiments" />
-                  <Stat size="sm" label="Budget" value={fmtUsdc(m.budgetMicro, { unit: false })} sub="USDC" />
-                  <Stat size="sm" label="Spent" value={fmtUsdc(sum.spent, { unit: false })} sub="settled + in flight" />
-                  <Stat size="sm" label="Cost / qualified" value={sum.costPerQualified ? fmtUsdc(sum.costPerQualified, { unit: false }) : "—"} sub="USDC, measured" />
-                  <Stat size="sm" label="Experiments" value={sum.experiments} sub={`${sum.successful} successful`} />
-                  <Stat size="sm" label="Committed" value={fmtUsdc(sum.committed, { unit: false })} sub="reserved by live tests" />
-                  <Stat size="sm" label="Available" value={fmtUsdc(sum.available, { unit: false })} tone="good" sub="uncommitted" />
-                  <Stat size="sm" label="Growth efficiency" value={`${sum.efficiency}/100`} sub="composite score" />
+                  <Stat size="sm" label="From tests" value={sum.attributed} sub="counted through tracked links" />
+                  <Stat size="sm" label="Monthly budget" value={fmtUsdc(m.budgetMicro, { unit: false })} sub="USDC" />
+                  <Stat size="sm" label="Spent" value={fmtUsdc(sum.spent, { unit: false })} sub="paid or being paid" />
+                  <Stat size="sm" label="Cost each" value={sum.costPerQualified ? fmtUsdc(sum.costPerQualified, { unit: false }) : "—"} sub="USDC per result" />
+                  <Stat size="sm" label="Tests" value={sum.experiments} sub={`${sum.successful} worked`} />
+                  <Stat size="sm" label="Set aside" value={fmtUsdc(sum.committed, { unit: false })} sub="for running tests" />
+                  <Stat size="sm" label="Left" value={fmtUsdc(sum.available, { unit: false })} tone="good" sub="for new tests" />
+                  <Stat size="sm" label="Overall score" value={`${sum.efficiency}/100`} sub="goal, cost and hit rate" />
                 </div>
               </CardBody>
               <div className="border-t border-line lg:border-l lg:border-t-0">
                 <div className="px-4 pb-3 pt-4">
-                  <div className="label mb-2">Allocation by category</div>
-                  <StackedBar total={m.budgetMicro} parts={sum.allocation.map((a) => ({ key: a.category, label: CATEGORY_LABEL[a.category] ?? a.category, value: a.allocated, display: fmtUsdc(a.allocated, { unit: false }) }))} />
+                  <div className="label mb-2">Spent by type</div>
+                  {sum.allocation.some((a) => a.used > 0) ? <StackedBar total={Math.max(1, sum.allocation.reduce((n, a) => n + a.used, 0))} parts={sum.allocation.filter((a) => a.used > 0).map((a) => ({ key: a.category, label: CATEGORY_LABEL[a.category] ?? a.category, value: a.used, display: fmtUsdc(a.used, { unit: false }) }))} /> : <p className="text-[12.5px] text-ink-3">Nothing spent yet this month.</p>}
                 </div>
-                {sum.allocation.length > 0 ? (
+                {sum.allocation.some((a) => a.used > 0) && (
                   <Table className="border-t border-line">
                     <thead>
                       <tr>
-                        <th>Category</th>
-                        <th className="text-right">Allocated</th>
-                        <th className="text-right">Used</th>
-                        <th className="text-right">Used %</th>
+                        <th>Type</th>
+                        <th className="text-right">Spent</th>
+                        <th className="text-right">Share of the month</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sum.allocation.map((a) => (
+                      {sum.allocation.filter((a) => a.used > 0).map((a) => (
                         <tr key={a.category}>
                           <td>{CATEGORY_LABEL[a.category] ?? a.category}</td>
-                          <td className="num text-right">{fmtUsdc(a.allocated, { unit: false })}</td>
                           <td className="num text-right text-ink-2">{fmtUsdc(a.used, { unit: false })}</td>
-                          <td className="num text-right text-ink-3">{a.allocated ? Math.round((a.used / a.allocated) * 100) : 0}%</td>
+                          <td className="num text-right text-ink-3">{m.budgetMicro ? Math.round((a.used / m.budgetMicro) * 100) : 0}%</td>
                         </tr>
                       ))}
                     </tbody>
                   </Table>
-                ) : (
-                  <p className="px-4 pb-4 text-[12.5px] text-ink-3">No category allocations on this mission.</p>
                 )}
+                <p className="px-4 pb-4 pt-2 text-[11.5px] text-ink-4">A report, not a limit: any kind of spend can use the whole monthly budget.</p>
               </div>
             </div>
             <CardFooter>
-              <span>Growth efficiency = 50% goal attainment + 30% cost efficiency vs plan + 20% experiment hit-rate.</span>
+              <span>Overall score = 50% how close you are to the goal + 30% cost per result vs plan + 20% share of tests that worked.</span>
               <Link href="/app/experiments" className="inline-flex shrink-0 items-center gap-1 hover:text-ink">
-                Experiments <ArrowRight className="size-3" />
+                Tests <ArrowRight className="size-3" />
               </Link>
             </CardFooter>
           </Card>
@@ -150,7 +147,7 @@ export default async function Missions() {
 
       {missions.length > 0 && (
         <Card>
-          <CardHeader title="Learning & reallocation" description="Compares measured CPA across experiments; stops losers and moves unspent budget to winners, through policy" icon={<Brain />} action={operate && hasActive ? <ActionButton action={runLearningAction} label="Run learning now" size="xs" logTitle="Learning run" /> : undefined} />
+          <CardHeader title="What we learned" description="Compares the cost per result of your tests, stops the ones that aren't working and moves their unspent budget to the ones that are" icon={<Brain />} action={operate && hasActive ? <ActionButton action={runLearningAction} label="Compare results now" size="xs" logTitle="Compare results" /> : undefined} />
           {learnings.length ? (
             <ul className="divide-y divide-line">
               {learnings.map((l) => (
@@ -187,7 +184,7 @@ export default async function Missions() {
               ))}
             </ul>
           ) : (
-            <CardBody className="text-[12.5px] text-ink-3">No learning runs yet. They run automatically each cycle once experiments have measured spend, or on demand with “Run learning now”.</CardBody>
+            <CardBody className="text-[12.5px] text-ink-3">Nothing yet. GrowTendril compares results after each scan once tests have spent something, or when you click “Compare results now”.</CardBody>
           )}
         </Card>
       )}

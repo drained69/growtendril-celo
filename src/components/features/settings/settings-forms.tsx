@@ -162,31 +162,31 @@ type Policy = { autonomousLimit: string; dailySpend: string; hardCeiling: string
 
 export function PolicyForm({ p, disabled }: { p: Policy; disabled?: boolean }) {
   const [state, action, pending] = useActionState(updatePolicyAction, null);
-  useResultToast(state, "Policy saved");
+  useResultToast(state, "Limits saved");
   const autonomous = Number(p.autonomousLimit) > 0;
   return (
     <form action={action} onSubmit={keepValues(action)}>
       <fieldset disabled={disabled} className="space-y-4 p-4">
         <p className="text-[12.5px] leading-relaxed text-ink-2">
           {autonomous
-            ? `GrowTendril buys research, data and API services on its own up to ${p.autonomousLimit} USDC per payment while the day's total stays under the daily limit. Everything else asks you first.`
-            : "Every payment asks you first. Set an autonomous limit above 0 to let GrowTendril buy research, data and API services on its own."}{" "}
-          Payments to people — creators, bounties, partners — always need your approval, and no payment can exceed the hard ceiling.
+            ? `GrowTendril buys research and data on its own up to ${p.autonomousLimit} USDC at a time, while the day's total stays under the daily limit. Everything else asks you first.`
+            : "Every payment asks you first. Set the first limit above 0 to let GrowTendril buy research and data on its own."}{" "}
+          Payments to people — creators, bounties, partners — always ask you first, and no payment can be bigger than the largest single payment.
         </p>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Spend on its own up to" htmlFor="pol-autonomousLimit" hint="Per payment, research and services only. 0 = always ask.">
+          <Field label="Research on its own, up to" htmlFor="pol-autonomousLimit" hint="Per purchase, research and data only. 0 = always ask.">
             <Input id="pol-autonomousLimit" name="autonomousLimit" type="number" min={0} step="0.000001" defaultValue={p.autonomousLimit} inputMode="decimal" />
           </Field>
-          <Field label="Daily limit" htmlFor="pol-dailySpend" hint="Above this total in a day, every payment asks you.">
+          <Field label="Daily limit" htmlFor="pol-dailySpend" hint="Above this total in a day, anything bought on its own asks you instead.">
             <Input id="pol-dailySpend" name="dailySpend" type="number" min={0} step="0.000001" defaultValue={p.dailySpend} inputMode="decimal" />
           </Field>
-          <Field label="Per-payment hard ceiling" htmlFor="pol-hardCeiling" hint="Your maximum per payment. Approval can't override it.">
+          <Field label="Largest single payment" htmlFor="pol-hardCeiling" hint="No payment can be bigger, even with your OK.">
             <Input id="pol-hardCeiling" name="hardCeiling" type="number" min="0.000001" step="0.000001" defaultValue={p.hardCeiling} inputMode="decimal" />
           </Field>
         </div>
-        <div className="rounded-[8px] border border-line p-3 text-[12px] text-ink-3">Celo mainnet · {p.tokens.join(", ") || "USDC"} only · no cross-chain transfers. Never allowed: {p.forbidden.map((f) => ({ mass_unsolicited_messaging: "mass unsolicited messages", automated_dm: "automated DMs", automated_cold_email: "automated cold email", automated_mentions: "automated mentions" } as Record<string, string>)[f] ?? f.replace(/_/g, " ")).join(", ")}.</div>
+        <div className="rounded-[8px] border border-line p-3 text-[12px] text-ink-3">Pays in {p.tokens.join(", ") || "USDC"} on the Celo network only. Never allowed: {p.forbidden.map((f) => ({ mass_unsolicited_messaging: "mass unsolicited messages", automated_dm: "automated DMs", automated_cold_email: "automated cold email", automated_mentions: "automated mentions" } as Record<string, string>)[f] ?? f.replace(/_/g, " ")).join(", ")}.</div>
       </fieldset>
-      <FormFooter pending={pending} label="Save policy" disabled={disabled} state={state} note="Changes are versioned and audit-logged." />
+      <FormFooter pending={pending} label="Save limits" disabled={disabled} state={state} note="Every change is kept with who made it." />
     </form>
   );
 }
@@ -194,10 +194,10 @@ export function PolicyForm({ p, disabled }: { p: Policy; disabled?: boolean }) {
 // ───────────────────────────── autopilot ─────────────────────────────
 
 const CADENCE_HELP: Record<string, string> = {
-  off: "The agent only runs when someone clicks Run agent.",
-  hourly: "May scan as soon as credit is available, then every hour.",
-  every_6h: "May scan as soon as credit is available, then every six hours.",
-  daily: "May scan as soon as credit is available, then once a day.",
+  off: "Scans only run when someone clicks Scan for customers.",
+  hourly: "Scans every hour — 24 scans a day. That uses credit fast; most businesses don't need it.",
+  every_6h: "Scans every six hours, starting as soon as there is credit.",
+  daily: "Scans once a day, starting as soon as there is credit.",
 };
 
 export function AutopilotControl({ value, labels, disabled, billing }: { value: string; labels: Record<string, string>; disabled?: boolean; billing?: boolean }) {

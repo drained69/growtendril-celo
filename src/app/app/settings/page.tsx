@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { AlertTriangle, Bot, Building2, FileText, Mail, ShieldCheck, Target, UserRound } from "lucide-react";
+import { AlertTriangle, Bot, Building2, FileText, Mail, PiggyBank, ShieldCheck, Target, UserRound } from "lucide-react";
+import { activeMission } from "@/server/queries/missions";
+import { budgetChoice, monthUsage } from "@/server/domain/growth/monthly-budget";
+import { resetLabel } from "@/lib/budget";
+import { BudgetForm } from "@/components/features/settings/budget-form";
 import { balanceMicro, billingMode } from "@/server/domain/billing";
 import { fmtUsdc } from "@/lib/money";
 import { googleConfigured } from "@/server/auth/google";
@@ -20,7 +24,7 @@ const SECTIONS = [
   { id: "workspace", label: "Workspace", icon: <Building2 /> },
   { id: "profile", label: "Product profile", icon: <FileText /> },
   { id: "icp", label: "Ideal customer", icon: <Target /> },
-  { id: "policy", label: "Spend policy", icon: <ShieldCheck /> },
+  { id: "budget", label: "Budget", icon: <PiggyBank /> },
   { id: "autopilot", label: "Autopilot", icon: <Bot /> },
   { id: "account", label: "Account & billing", icon: <UserRound /> },
   { id: "danger", label: "Danger zone", icon: <AlertTriangle /> },
@@ -50,6 +54,8 @@ export default async function Settings() {
     balanceMicro(db, project.ownerId),
     db.select().from(s.emailLog).where(eq(s.emailLog.userId, user.id)).orderBy(desc(s.emailLog.createdAt)).limit(6),
   ]);
+  const mission = await activeMission(db, pid);
+  const [choice, usage] = await Promise.all([budgetChoice(db, pid, mission), mission ? monthUsage(db, mission) : Promise.resolve(null)]);
   const mode = billingMode();
   const canWorkspace = can(role, "manage_workspace");
   const canPolicy = can(role, "manage_policy");
@@ -60,7 +66,7 @@ export default async function Settings() {
     <div>
       <PageHeader
         title="Settings"
-        description="Workspace details, the product profile that drives discovery, your ideal customer, and the founder's hard spending rules."
+        description="Your workspace, what GrowTendril knows about your product and customers, your budget, and Autopilot."
         meta={
           <>
             <ModeBadge mode={project.dataMode} />
@@ -101,8 +107,8 @@ export default async function Settings() {
 
           <Card id="profile" className="scroll-mt-4">
             <CardHeader
-              title="Product intelligence profile"
-              description="What GrowTendril believes your product is. Edit anything that is wrong — search terms here drive discovery."
+              title="Your product"
+              description="What GrowTendril believes you sell. Fix anything that's wrong — the search words here decide what it looks for."
               icon={<FileText />}
               action={
                 profile && (
@@ -139,30 +145,40 @@ export default async function Settings() {
           </Card>
 
           <Card id="icp" className="scroll-mt-4">
-            <CardHeader title="Ideal customer profile" description="Who the agent qualifies companies against." icon={<Target />} />
+            <CardHeader title="Your ideal customer" description="Who GrowTendril looks for when it checks whether a company is a good fit." icon={<Target />} />
             {icps.length ? (
               <IcpForm icps={icps} disabled={!canWorkspace} />
             ) : (
-              <CardBody className="text-[12.5px] text-ink-3">No ICP yet. It is proposed from the product profile during onboarding step 2.</CardBody>
+              <CardBody className="text-[12.5px] text-ink-3">Not set yet. GrowTendril suggests one from your product profile during setup.</CardBody>
+            )}
+          </Card>
+
+          <Card id="budget" className="scroll-mt-4">
+            <CardHeader title="Budget" description="One monthly number, the largest single payment, and what GrowTendril may buy on its own." icon={<PiggyBank />} />
+            {mission && choice ? (
+              <BudgetForm disabled={!canPolicy} current={choice} usage={usage ? `This month: ${fmtUsdc(usage.usedMicro)} of ${fmtUsdc(usage.budgetMicro)} used · resets on ${resetLabel(usage.resetsAt)}. Unspent money doesn't roll over.` : undefined} />
+            ) : (
+              <CardBody className="text-[12.5px] text-ink-3">{choice ? "Set a goal first — your monthly budget belongs to it." : "Finish setting up your workspace first."} <Link className="underline" href={choice ? "/onboarding?step=3" : "/onboarding"}>{choice ? "Set a goal" : "Continue setup"}</Link></CardBody>
             )}
           </Card>
 
           <Card id="policy" className="scroll-mt-4">
             <CardHeader
-              title="Spend policy"
-              description="Checked by a fixed rules engine on every action, not by a prompt. Publish changes on the Wallet page so your workspace contract enforces them too."
+              title="Advanced: exact limits"
+              description="The detailed limits behind your budget. Saving your budget above resets them to match it. Every payment is checked against them, and your Payout account enforces them too once you confirm them in your wallet."
               icon={<ShieldCheck />}
               action={
                 policy && (
                   <span className="flex items-center gap-1.5">
-                    <Badge tone={policy.autonomyEnabled ? "good" : "muted"}>{policy.autonomyEnabled ? `Autonomous ≤ ${microToDecimal(Math.min(policy.maxTransactionMicro, effectivePaymentCeiling(policy)))} USDC` : "Asks first"}</Badge>
-                    <Badge className="num">v{policy.version}</Badge>
+                    <Badge tone={policy.autonomyEnabled ? "good" : "muted"}>{policy.autonomyEnabled ? `Research on its own ≤ ${microToDecimal(Math.min(policy.maxTransactionMicro, effectivePaymentCeiling(policy)))} USDC` : "Always asks"}</Badge>
+                    <Badge className="num">version {policy.version}</Badge>
                   </span>
                 )
               }
             />
             {policy ? (
-              <>
+              <details className="group">
+                <summary className="cursor-pointer px-4 py-3 text-[12.5px] font-medium text-ink-2 hover:text-ink">Show exact limits</summary>
                 <PolicyForm
                   disabled={!canPolicy}
                   p={{
@@ -174,30 +190,30 @@ export default async function Settings() {
                   }}
                 />
                 <CardFooter>Last changed {relTime(policy.updatedAt)}</CardFooter>
-              </>
+              </details>
             ) : (
-              <CardBody className="text-[12.5px] text-ink-3">No policy yet — it is created in the final onboarding step.</CardBody>
+              <CardBody className="text-[12.5px] text-ink-3">No limits yet. They are set in the last setup step.</CardBody>
             )}
           </Card>
 
           <Card id="autopilot" className="scroll-mt-4">
             <CardHeader
               title="Autopilot"
-              description="How often the agent runs a full cycle on its own. Every action still passes your spending rules."
+              description="How often GrowTendril scans for customers on its own. Each scan is paid from your credit (the GrowTendril fee). Every payment still follows your budget."
               icon={<Bot />}
               action={<Badge tone={project.autopilot === "off" ? "muted" : "good"} dot={project.autopilot !== "off"}>{AUTOPILOT_LABEL[project.autopilot] ?? project.autopilot}</Badge>}
             />
             <AutopilotControl value={project.autopilot} labels={AUTOPILOT_LABEL} disabled={!canPolicy} billing={mode !== "off"} />
             <CardFooter>
-              <span>{project.lastCycleAt ? `Last cycle ${relTime(project.lastCycleAt)}` : "No cycle has run yet"}</span>
+              <span>{project.lastCycleAt ? `Last scan ${relTime(project.lastCycleAt)}` : "No scan has run yet"}</span>
               <Link href="/app/runs" className="hover:text-ink">
-                View runs →
+                See scan history →
               </Link>
             </CardFooter>
           </Card>
 
           <Card id="account" className="scroll-mt-4">
-            <CardHeader title="Account & billing" description="Your sign-in, your credit, and what GrowTendril has emailed you." icon={<UserRound />} />
+            <CardHeader title="Account & billing" description="Your sign-in, your credit for scans, and what GrowTendril has emailed you." icon={<UserRound />} />
             <ul className="divide-y divide-line text-[12.5px]">
               <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
@@ -222,9 +238,9 @@ export default async function Settings() {
                 <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                   <div>
                     <div className="font-medium text-ink">
-                      Credit balance <span className="num ml-1">{fmtUsdc(credit)}</span>
+                      Credit <span className="num ml-1">{fmtUsdc(credit)}</span>
                     </div>
-                    <div className="mt-0.5 text-[12px] text-ink-3">{project.ownerId === user.id ? "Services in workspaces you own are paid from this balance." : "Services in this workspace are paid from its owner's balance."}</div>
+                    <div className="mt-0.5 text-[12px] text-ink-3">{project.ownerId === user.id ? "Pays the GrowTendril fee for scans and reports in workspaces you own. Separate from your growth budget." : "Scans in this workspace are paid from its owner's credit."}</div>
                   </div>
                   <span className="flex items-center gap-2">
                     <LinkButton href="/billing" size="sm">

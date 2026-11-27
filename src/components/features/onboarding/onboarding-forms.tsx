@@ -8,6 +8,9 @@ import { toast } from "@/components/ui/toast";
 import { templatesFor } from "@/lib/missions";
 import { keepValues } from "@/components/ui/submit";
 import { autopilotCostLabel, SERVICES } from "@/lib/services";
+import { DEFAULT_MONTHLY_BUDGET_USDC, deriveLimits } from "@/lib/budget";
+import { UsdcHelp } from "@/components/features/billing/usdc-help";
+import { fmtUsdc, toMicro } from "@/lib/money";
 
 function StepFooter({ children, error, note }: { children: ReactNode; error?: string | null; note?: ReactNode }) {
   return (
@@ -134,12 +137,12 @@ export function QuickStartStep({ website = "" }: { website?: string }) {
         {pending && (
           <div role="status" className="flex items-start gap-2 rounded-[8px] border border-line bg-surface-2/50 p-3 text-[12.5px] text-ink-2">
             <Loader2 className="mt-0.5 size-3.5 shrink-0 animate-spin text-accent" />
-            <p>Reading your public pages and preparing your product profile, customers, first goal and safe limits. We&apos;ll show the result when setup is complete.</p>
+            <p>Reading your public pages and preparing your product, your ideal customer, a first goal and a starting budget of {DEFAULT_MONTHLY_BUDGET_USDC} USDC a month. You&apos;ll check all of it next.</p>
           </div>
         )}
         {!pending && state && !state.ok && <Callout tone="danger">{state.error}</Callout>}
       </div>
-      <StepFooter note="Setup is free. Paid scans use service credit. Creator payments always need approval.">
+      <StepFooter note={`Setup is free. Scans are paid from credit (the GrowTendril fee). We always ask before paying a person. Starting budget: ${DEFAULT_MONTHLY_BUDGET_USDC} USDC a month — you can change it any time.`}>
         <Button type="submit" variant="primary" size="md" loading={pending} icon={<Sparkles />}>
           {pending ? "Preparing your workspace…" : "Build my workspace"}
         </Button>
@@ -161,13 +164,13 @@ export function GenerateIcp() {
       onClick={() =>
         start(async () => {
           const r = await onboardIcpAction();
-          if (r.ok) toast.success("ICP proposed", r.message);
-          else toast.error("Couldn’t propose an ICP", r.error);
+          if (r.ok) toast.success("Ideal customer suggested", r.message);
+          else toast.error("Couldn’t suggest your ideal customer", r.error);
           router.refresh();
         })
       }
     >
-      {pending ? "Proposing ICP…" : "Looks right — propose my ICP"}
+      {pending ? "Suggesting your ideal customer…" : "Looks right — suggest my ideal customer"}
       {!pending && <ArrowRight />}
     </Button>
   );
@@ -189,7 +192,7 @@ export function MissionStep({ audience, category }: { audience?: string | null; 
   return (
     <form action={action} onSubmit={keepValues(action)}>
       <div className="space-y-4 p-4">
-        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Mission template">
+        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Goal">
           {TEMPLATES.map((x) => {
             const active = t.key === x.key;
             return (
@@ -211,24 +214,22 @@ export function MissionStep({ audience, category }: { audience?: string | null; 
           })}
         </div>
         <input type="hidden" name="template" value={t.key} />
-        <div className="grid grid-cols-3 gap-3" key={t.key}>
-          <Field label="Goal" htmlFor="ms-goal">
+        <div className="grid gap-3 sm:grid-cols-2" key={t.key}>
+          <Field label="How many a month" htmlFor="ms-goal" hint={t.goalDescription}>
             <Input id="ms-goal" name="goal" type="number" required min={1} max={1000000} step={1} defaultValue={t.goal} inputMode="numeric" className="num" />
           </Field>
-          <Field label="Days" htmlFor="ms-days">
-            <Input id="ms-days" name="days" type="number" required min={1} max={180} step={1} defaultValue={t.days} inputMode="numeric" className="num" />
-          </Field>
-          <Field label="Budget" htmlFor="ms-budget">
+          <Field label="Monthly growth budget" htmlFor="ms-budget" hint="The most GrowTendril can spend on tests each month. You can change this any time.">
             <div className="relative">
-              <Input id="ms-budget" name="budget" type="number" required min={0} step="0.000001" defaultValue={t.budget} inputMode="decimal" className="num pr-12" />
+              <Input id="ms-budget" name="budget" type="number" required min={1} step="0.000001" defaultValue={DEFAULT_MONTHLY_BUDGET_USDC} inputMode="decimal" className="num pr-12" />
               <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[11px] text-ink-4">USDC</span>
             </div>
           </Field>
         </div>
+        <UsdcHelp compact />
       </div>
-      <StepFooter error={!pending && state && !state.ok ? state.error : null} note="The budget is a ceiling, not a commitment. Unspent USDC stays in your workspace contract, and you can withdraw it any time.">
+      <StepFooter error={!pending && state && !state.ok ? state.error : null} note="A budget is a limit, not a charge. Nothing is paid until you approve it, and unspent money stays yours.">
         <Button type="submit" variant="primary" size="md" loading={pending}>
-          Set mission
+          Set goal and budget
           {!pending && <ArrowRight />}
         </Button>
       </StepFooter>
@@ -238,72 +239,74 @@ export function MissionStep({ audience, category }: { audience?: string | null; 
 
 // ───────────────────────────── step 4 ─────────────────────────────
 
-const LIMITS = [
-  { name: "autonomousLimit", label: "Spend on its own up to", d: "0", hint: "Per payment, for research, data and API services from the Celo research catalog. 0 = always ask you first", fixed: false },
-  { name: "dailySpend", label: "Daily limit", d: "10", hint: "Above this total in a day, every payment asks you first", fixed: false },
-  { name: "hardCeiling", label: "Per-payment hard ceiling", d: "10", hint: "The largest single payment, even with your approval. Starts at 10 USDC; raise it if you plan bigger creator rewards", fixed: false },
-];
-
-export function AutonomyStep({ autopilot, billing }: { autopilot: Record<string, string>; billing?: boolean }) {
+export function AutonomyStep({ autopilot, billing, monthlyMicro }: { autopilot: Record<string, string>; billing?: boolean; monthlyMicro: number }) {
   const [state, action, pending] = useActionState(onboardAutonomyAction, null);
   const [cadence, setCadence] = useState("off");
+  const [research, setResearch] = useState(false);
+  const [researchMonthly, setResearchMonthly] = useState(String(Math.min(5, monthlyMicro / 1e6)));
+  const limits = deriveLimits({ monthlyMicro, researchMonthlyMicro: research && /^\d+(\.\d{1,6})?$/.test(researchMonthly) ? toMicro(researchMonthly) : 0 });
   return (
     <form action={action} onSubmit={keepValues(action)}>
       <div className="divide-y divide-line">
-        {LIMITS.map((l) => (
-          <div key={l.name} className="grid grid-cols-[minmax(0,1fr)_150px] items-center gap-4 px-4 py-3">
-            <label htmlFor={`au-${l.name}`} className="min-w-0">
-              <span className="block text-[12.5px] font-medium text-ink">{l.label}</span>
-              <span className="block text-[11.5px] text-ink-3">{l.hint}</span>
-            </label>
-            <div className="relative">
-              <Input id={`au-${l.name}`} name={l.name} type="number" min={l.name === "hardCeiling" ? "0.000001" : 0} step="0.000001" defaultValue={l.d} inputMode="decimal" readOnly={l.fixed} aria-readonly={l.fixed} className={cn("num pr-12 text-right", l.fixed && "cursor-not-allowed bg-surface-2 text-ink-3")} />
-              <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[11px] text-ink-4">USDC</span>
-            </div>
-          </div>
-        ))}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
+          <span><span className="block text-[12.5px] font-medium text-ink">Monthly growth budget</span><span className="block text-[11.5px] text-ink-3">From the last step. It starts again every 30 days.</span></span>
+          <span className="num text-[13px] font-medium text-ink">{fmtUsdc(monthlyMicro)}</span>
+        </div>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
+          <span><span className="block text-[12.5px] font-medium text-ink">Largest single payment</span><span className="block text-[11.5px] text-ink-3">A quarter of your budget, at most $50. No payment can be bigger, even with your OK.</span></span>
+          <span className="num text-[13px] font-medium text-ink">{fmtUsdc(limits.hardCeilingMicro)}</span>
+        </div>
+        <div className="px-4 py-3 text-[12.5px] text-ink-2">
+          <span className="font-medium text-ink">Payments to people:</span> GrowTendril always asks you first.
+        </div>
+        <div className="space-y-2 px-4 py-3">
+          <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
+            <input type="checkbox" name="research" checked={research} onChange={(e) => setResearch(e.target.checked)} className="size-4 accent-[var(--color-accent)]" />
+            Let GrowTendril buy research on its own, up to
+            <span className="relative inline-block w-24"><Input aria-label="Research per month in USDC" name="researchMonthly" inputMode="decimal" value={researchMonthly} onChange={(e) => setResearchMonthly(e.target.value)} disabled={!research} className="num h-7 pr-10 text-right" /><span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10.5px] text-ink-4">USDC</span></span>
+            a month
+          </label>
+          <p className="text-[11.5px] text-ink-3">Off: it asks you before buying anything. You can change all of this in Settings → Budget.</p>
+        </div>
       </div>
 
       <div className="border-t border-line p-4">
         <div className="text-[12.5px] font-medium text-ink">Autopilot</div>
         <p className="text-[11.5px] text-ink-3">
-          How often the agent runs a full cycle on its own. You can change this in Settings.
-          {billing && <> Each run is one market scan ({SERVICES.scan.priceUsdc} USDC). If enabled, an overdue run can start as soon as you add credit.</>}
+          How often GrowTendril scans for customers on its own. You can change this in Settings.
+          {billing && <> Each scan costs {SERVICES.scan.priceUsdc} USDC of credit (the GrowTendril fee), separate from your growth budget. If it&apos;s on, an overdue scan can start as soon as you add credit.</>}
         </p>
         <input type="hidden" name="autopilot" value={cadence} />
         <div className="mt-2.5 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Autopilot cadence">
-          {Object.entries(autopilot).map(([k, label]) => {
-            const disabled = false;
-            return (
-              <button
-                key={k}
-                type="button"
-                role="radio"
-                aria-checked={cadence === k}
-                disabled={disabled}
-                onClick={() => setCadence(k)}
-                className={cn("h-7 rounded-[6px] border px-2.5 text-[12px] transition-colors disabled:opacity-40", cadence === k ? "border-accent bg-accent/10 text-ink" : "border-line-strong text-ink-3 hover:text-ink")}
-              >
-                {label}
-              </button>
-            );
-          })}
+          {Object.entries(autopilot).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={cadence === k}
+              onClick={() => setCadence(k)}
+              className={cn("h-7 rounded-[6px] border px-2.5 text-[12px] transition-colors disabled:opacity-40", cadence === k ? "border-accent bg-accent/10 text-ink" : "border-line-strong text-ink-3 hover:text-ink")}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         {billing && <p className={cn("num mt-2 text-[11.5px]", cadence === "hourly" ? "text-warning" : "text-ink-3")}>{autopilotCostLabel(cadence)}</p>}
+        {billing && cadence === "hourly" && <Callout tone="warn" className="mt-2">Hourly means 24 scans a day — about {24 * SERVICES.scan.priceUsdc} USDC of credit a day. Most businesses do well with once a day.</Callout>}
       </div>
 
       <div className="grid gap-2 border-t border-line p-4 text-[12px] sm:grid-cols-3">
         <div className="rounded-[8px] border border-good/30 bg-good/[0.04] p-2.5">
-          <div className="label text-good">Runs on its own</div>
-          <div className="mt-1 text-ink-2">Market research · scoring · growth plan · creator briefs · measuring results · data purchases up to your limit</div>
+          <div className="label text-good">Does on its own</div>
+          <div className="mt-1 text-ink-2">Finding customers and creators · scoring · your growth plan · creator briefs · counting results{research ? " · buying research up to your monthly limit" : ""}</div>
         </div>
         <div className="rounded-[8px] border border-warning/30 bg-warning/[0.04] p-2.5">
-          <div className="label text-warning">Needs your approval</div>
-          <div className="mt-1 text-ink-2">Creator payments · bounties · content · anything above your limits</div>
+          <div className="label text-warning">Asks you first</div>
+          <div className="mt-1 text-ink-2">Every payment to a person · bounties · content{research ? "" : " · research"} · anything above your limits</div>
         </div>
         <div className="rounded-[8px] border border-critical/30 bg-critical/[0.04] p-2.5">
-          <div className="label text-critical">Forbidden</div>
-          <div className="mt-1 text-ink-2">Mass unsolicited messaging · automated DMs, cold email, mentions</div>
+          <div className="label text-critical">Never</div>
+          <div className="mt-1 text-ink-2">Mass messages · automated DMs, cold email or mentions</div>
         </div>
       </div>
 
@@ -312,7 +315,7 @@ export function AutonomyStep({ autopilot, billing }: { autopilot: Record<string,
           <Callout tone="danger">{state.error}</Callout>
         </div>
       )}
-      <StepFooter note="Activating queues the first market scan right away.">
+      <StepFooter note={billing ? "Your first scan starts when you click Scan for customers, or when Autopilot runs." : "Activating starts your first scan right away."}>
         <Button type="submit" variant="primary" size="md" loading={pending}>
           {pending ? "Activating…" : "Activate GrowTendril"}
           {!pending && <ArrowRight />}

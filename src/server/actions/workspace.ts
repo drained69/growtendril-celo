@@ -10,6 +10,7 @@ import { ProductProfileSchema } from "@/server/domain/intel/product-analyst";
 import { toMicro } from "@/lib/money";
 import { fail, guard, type ActionResult } from "@/server/actions/_common";
 import { policyValues } from "@/server/domain/workspace/setup";
+import { setGrowthBudget } from "@/server/domain/growth/monthly-budget";
 
 const Amount = z.string().regex(/^\d+(\.\d{1,6})?$/, "Enter a USDC amount");
 const PolicyForm = z.object({
@@ -17,6 +18,29 @@ const PolicyForm = z.object({
   hardCeiling: Amount,
   autonomousLimit: Amount,
 });
+
+const BudgetForm = z.object({
+  monthly: Amount,
+  largest: z.union([Amount, z.literal("")]).optional(),
+  research: z.enum(["on", "off"]).default("off"),
+  researchMonthly: z.union([Amount, z.literal("")]).optional(),
+});
+
+/** Settings → Budget: the three things an owner sets. Everything else is derived (see lib/budget.ts). */
+export async function updateBudgetAction(_: unknown, form: FormData): Promise<ActionResult> {
+  try {
+    const { project, db, user } = await guard("manage_policy");
+    const f = BudgetForm.parse({ monthly: form.get("monthly"), largest: form.get("largest") ?? "", research: form.get("research") === "on" ? "on" : "off", researchMonthly: form.get("researchMonthly") ?? "" });
+    const researchMonthlyMicro = f.research === "on" ? toMicro(f.researchMonthly || "0") : 0;
+    if (f.research === "on" && researchMonthlyMicro <= 0) return { ok: false, error: "Enter how much research GrowTendril may buy on its own each month, or turn that off." };
+    await setGrowthBudget(db, { projectId: project.id, actorId: user.id, monthlyMicro: toMicro(f.monthly), largestPaymentMicro: f.largest ? toMicro(f.largest) : undefined, researchMonthlyMicro });
+    revalidatePath("/app", "layout");
+    const [contract] = await db.select({ id: s.wallets.id }).from(s.wallets).where(and(eq(s.wallets.projectId, project.id), eq(s.wallets.provider, "growth_vault")));
+    return { ok: true, message: contract ? "Budget saved. Your budget changed — confirm it in your wallet on the Payout account page so your contract enforces it." : "Budget saved" };
+  } catch (e) {
+    return fail(e);
+  }
+}
 
 export async function updatePolicyAction(_: unknown, form: FormData): Promise<ActionResult> {
   try {
@@ -37,7 +61,7 @@ export async function updatePolicyAction(_: unknown, form: FormData): Promise<Ac
     });
     revalidatePath("/app", "layout");
     const [contract] = await db.select({ id: s.wallets.id }).from(s.wallets).where(and(eq(s.wallets.projectId, project.id), eq(s.wallets.provider, "growth_vault")));
-    return { ok: true, message: contract ? `Rules saved (v${version}). Publish them on the Wallet page so your workspace contract enforces them.` : `Policy saved (v${version})` };
+    return { ok: true, message: contract ? `Limits saved (version ${version}). Your limits changed — confirm them in your wallet on the Payout account page so your contract enforces them.` : `Limits saved (version ${version})` };
   } catch (e) {
     return fail(e);
   }

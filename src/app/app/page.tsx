@@ -20,6 +20,8 @@ import { GoalProgress, StackedBar, BarList, Sparkline } from "@/components/chart
 import { ActionButton } from "@/components/features/agent/action-button";
 import { OverviewHero } from "@/components/features/workspace/overview-hero";
 import { SetupSummary } from "@/components/features/workspace/setup-summary";
+import { resetLabel } from "@/lib/budget";
+import { effectivePaymentCeiling } from "@/server/domain/agent/policy";
 import { sourceAppliesTo } from "@/lib/source-readiness";
 import { nextGrowthStep } from "@/lib/next-growth-step";
 import { OpportunityCards } from "@/components/features/growth/opportunity-cards";
@@ -75,11 +77,11 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     permissions: { operate: can(role, "operate"), approve: can(role, "approve"), manageProfile: can(role, "manage_workspace"), managePolicy: can(role, "manage_policy"), manageIntegrations: can(role, "manage_integrations"), ownsCredit: project.ownerId === user.id },
   });
   const setup = [
-    { done: !!mission, label: "Set a mission", detail: "A goal and a USDC budget to work against", href: "/app/missions", icon: <Flag /> },
-    { done: !!customerProfile, label: "Review product context", detail: "What you sell and who it is for — drives discovery", href: "/app/settings#profile", icon: <Globe /> },
-    { done: connected > 0, label: "Connect market sources", detail: `${connected} of ${connections.length} sources ready`, href: "/app/integrations", icon: <Plug /> },
+    { done: !!mission, label: "Set a goal and monthly budget", detail: "What you want more of, and the most to spend on it each month", href: "/onboarding?step=3", icon: <Flag /> },
+    { done: !!customerProfile, label: "Check what you sell", detail: "What you sell and who it's for — this decides what GrowTendril looks for", href: "/app/settings#profile", icon: <Globe /> },
+    { done: connected > 0, label: "Choose where to look", detail: `${connected} of ${connections.length} places ready`, href: "/app/integrations", icon: <Plug /> },
     ...(credit != null ? [{ done: !lowCredit, label: "Add credit", detail: lowCredit ? `${fmtUsdc(credit)} left — a scan costs ${fmtUsdc(servicePriceMicro("scan"))}` : `${fmtUsdc(credit)} on the balance`, href: "/billing", icon: <Coins /> }] : []),
-    { done: !!project.lastCycleAt, label: "Run the first scan", detail: scanning?.status === "queued" ? "Queued — waiting for the worker" : scanning ? "Scan in progress…" : "Collect evidence from connected sources", href: "/app/runs", icon: <Radar /> },
+    { done: !!project.lastCycleAt, label: "Your first scan for customers", detail: scanning?.status === "queued" ? "Waiting to start" : scanning ? "Scanning now…" : "Start it with “Scan for customers” at the top of this page", href: "/app/runs", icon: <Radar /> },
   ];
   const setupLeft = setup.filter((x) => !x.done).length;
 
@@ -94,15 +96,15 @@ export default async function Overview({ searchParams }: { searchParams: Promise
             <ModeBadge mode={project.dataMode} />
             <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2/60 px-2.5 py-0.5">
               <StatusDot tone={scanning ? "info" : "good"} pulse />
-              {scanning?.status === "queued" ? "Scan queued — waiting for the worker" : scanning ? "Scanning the market now" : project.lastCycleAt ? `Last cycle ${relTime(project.lastCycleAt)}` : "No cycle has run yet"}
+              {scanning?.status === "queued" ? "Scan waiting to start" : scanning ? "Scanning for customers now" : project.lastCycleAt ? `Last scan ${relTime(project.lastCycleAt)}` : "No scan yet"}
             </span>
-            {mission && sum && <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2/60 px-2.5 py-0.5"><Flag className="size-3" />{sum.daysLeft} days left in “{mission.name}”</span>}
+            {mission && sum && <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2/60 px-2.5 py-0.5"><Flag className="size-3" />This month: {fmtUsdc(sum.spent + sum.pending)} of {fmtUsdc(mission.budgetMicro)} used · resets on {resetLabel(mission.endsAt)}</span>}
           </>
         }
         actions={
           <>
             {next.kind === "scan" ? <ActionButton action={runCycleAction} label={priced(next.label, "scan")} variant="primary" icon={<Radar />} /> : <LinkButton href={next.href} variant="primary" icon={<ArrowRight />}>{next.label}</LinkButton>}
-            <LinkButton href="/app/discover" variant="outline" icon={<Radar />}>Browse evidence</LinkButton>
+            <LinkButton href="/app/discover" variant="outline" icon={<Radar />}>See what we found</LinkButton>
             <LinkButton href="/app/plan" variant="outline" icon={<ArrowRight />}>Growth plan</LinkButton>
             {can(role, "operate") && next.kind !== "scan" && <ActionButton action={runCycleAction} label={priced("Scan again", "scan")} variant="ghost" icon={<Radar />} disabled={!!scanning || lowCredit || connected === 0 || !customerProfile || !mission} />}
           </>
@@ -111,29 +113,29 @@ export default async function Overview({ searchParams }: { searchParams: Promise
 
       {plays.length > 0 && (
         <section aria-labelledby="recommended-plays-title" className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="recommended-plays-title" className="text-[19px] font-semibold tracking-[-0.02em] text-ink">Growth opportunities to review</h2><p className="mt-1 text-[13px] text-ink-3">Recommended from your collected signals. Review the evidence before choosing a test.</p></div><div className="flex flex-wrap gap-2"><LinkButton href="/app/experiments/start" variant="primary" icon={<ArrowRight />}>Run one test</LinkButton><LinkButton href="/app/opportunities">All opportunities</LinkButton></div></div>
+          <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="recommended-plays-title" className="text-[19px] font-semibold tracking-[-0.02em] text-ink">Growth opportunities to review</h2><p className="mt-1 text-[13px] text-ink-3">Picked from what people are saying. Read what they said before you start a test.</p></div><div className="flex flex-wrap gap-2"><LinkButton href="/app/experiments/start" variant="primary" icon={<ArrowRight />}>Start a test</LinkButton><LinkButton href="/app/opportunities">All opportunities</LinkButton></div></div>
           <OpportunityCards items={plays} />
         </section>
       )}
 
-      {welcome === "quick" && quick && <SetupSummary website={project.website} profile={quick.profile} icps={quick.icps} mission={mission ?? null} scanning={!!scanning} scanStatus={scanning?.status} lowCredit={lowCredit} autopilot={credit != null ? `${AUTOPILOT_LABEL[project.autopilot] ?? project.autopilot} · ${autopilotCostLabel(project.autopilot)}` : undefined} />}
+      {welcome === "quick" && quick && <SetupSummary website={project.website} profile={quick.profile} icps={quick.icps} mission={mission ?? null} largestPaymentMicro={policy ? effectivePaymentCeiling(policy) : null} scanning={!!scanning} scanStatus={scanning?.status} lowCredit={lowCredit} autopilot={credit != null ? `${AUTOPILOT_LABEL[project.autopilot] ?? project.autopilot} · ${autopilotCostLabel(project.autopilot)}` : undefined} />}
 
       {welcome && welcome !== "quick" && (
         <Callout tone="success" title="Workspace created">
           {scanning?.status === "queued"
-            ? "The first market scan is queued, waiting for the worker. Check Agent runs for progress."
+            ? "Your first scan for customers is waiting to start. See scan history for progress."
             : scanning
-            ? "The first market scan is running in the background — evidence will appear here as it lands."
+            ? "Your first scan for customers is running. What it finds will appear here as it lands."
             : lowCredit
-              ? `Your workspace is ready. Add credit to run its first market scan (${fmtUsdc(servicePriceMicro("scan"))}).`
-              : "Your workspace is ready. Finish the checklist below so the operator can work end to end."}
+              ? `Your workspace is ready. Add credit to run its first scan (${fmtUsdc(servicePriceMicro("scan"))}, the GrowTendril fee).`
+              : "Your workspace is ready. Finish the checklist below and GrowTendril can do the rest."}
         </Callout>
       )}
 
       {setupLeft > 0 && (
         <Card>
           <CardHeader
-            title={project.lastCycleAt ? "Keep discovery ready" : "Prepare your first market scan"}
+            title={project.lastCycleAt ? "Keep scans ready" : "Get ready for your first scan"}
             description={`${setup.length - setupLeft} of ${setup.length} steps complete`}
             action={
               <span className="flex items-center gap-2">
@@ -158,7 +160,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         </Card>
       )}
 
-      {!live && <p className="px-1 text-[12px] text-ink-3">Ready to pay a creator? <Link href="/app/wallet" className="font-medium text-ink-2 underline underline-offset-4">Create your workspace contract</Link> to hold the budget the agent can pay from, under your rules.</p>}
+      {!live && <p className="px-1 text-[12px] text-ink-3">Ready to pay a creator? <Link href="/app/wallet" className="font-medium text-ink-2 underline underline-offset-4">Set up your Payout account</Link> — the money stays in an account only you control, and we ask before paying anyone.</p>}
 
       {mission && sum ? (
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -174,8 +176,8 @@ export default async function Overview({ searchParams }: { searchParams: Promise
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-6">
-                  <Stat size="sm" label="Attributed" value={sum.attributed} sub="to experiments" />
-                  <Stat size="sm" label="Cost / qualified" value={sum.costPerQualified ? fmtUsdc(sum.costPerQualified, { unit: false }) : "—"} sub="USDC, measured" />
+                  <Stat size="sm" label="From tests" value={sum.attributed} sub="counted through tracked links" />
+                  <Stat size="sm" label="Cost each" value={sum.costPerQualified ? fmtUsdc(sum.costPerQualified, { unit: false }) : "—"} sub="USDC per result" />
                   <Stat size="sm" label="Efficiency" value={sum.efficiency} sub="score out of 100" />
                 </div>
               </div>
@@ -190,31 +192,32 @@ export default async function Overview({ searchParams }: { searchParams: Promise
           </Card>
 
           <Card>
-            <CardHeader title="Budget" icon={<CircleDollarSign />} action={more("/app/wallet", "Wallet")} />
+            <CardHeader title="This month's budget" description={`Resets on ${resetLabel(mission.endsAt)}. Unspent money doesn't roll over.`} icon={<CircleDollarSign />} action={more("/app/settings#budget", "Change")} />
             <CardBody>
               <div className="grid grid-cols-4 gap-3">
-                <Stat size="sm" label="Total" value={fmtUsdc(mission.budgetMicro, { unit: false })} />
+                <Stat size="sm" label="Monthly" value={fmtUsdc(mission.budgetMicro, { unit: false })} />
                 <Stat size="sm" label="Spent" value={fmtUsdc(sum.spent, { unit: false })} />
-                <Stat size="sm" label="Committed" value={fmtUsdc(sum.committed, { unit: false })} />
-                <Stat size="sm" label="Available" value={fmtUsdc(sum.available, { unit: false })} tone="good" />
+                <Stat size="sm" label="Set aside" value={fmtUsdc(sum.committed, { unit: false })} sub="for running tests" />
+                <Stat size="sm" label="Left" value={fmtUsdc(sum.available, { unit: false })} tone="good" />
               </div>
-              <div className="mt-4">
-                <StackedBar total={mission.budgetMicro} parts={sum.allocation.map((a) => ({ key: a.category, label: CATEGORY_LABEL[a.category] ?? a.category, value: a.allocated, display: fmtUsdc(a.allocated, { unit: false }) }))} />
-              </div>
+              {sum.allocation.some((a) => a.used > 0) && <div className="mt-4">
+                <div className="label mb-2">Spent by type</div>
+                <StackedBar total={Math.max(1, sum.allocation.reduce((n, a) => n + a.used, 0))} parts={sum.allocation.filter((a) => a.used > 0).map((a) => ({ key: a.category, label: CATEGORY_LABEL[a.category] ?? a.category, value: a.used, display: fmtUsdc(a.used, { unit: false }) }))} />
+              </div>}
             </CardBody>
             <CardFooter>
               <span>
-                Today <span className="num text-ink">{fmtUsdc(spentToday)}</span> of {fmtUsdc(policy?.dailySpendMicro)}
+                Paid today <span className="num text-ink">{fmtUsdc(spentToday)}</span>
               </span>
               <span className="flex items-center gap-1.5">
                 <StatusDot tone={wallet?.frozen ? "bad" : live ? "good" : "warn"} />
-                {wallet?.frozen ? "Frozen" : live ? "Wallet live · Celo mainnet" : "Payments disabled"}
+                {wallet?.frozen ? "Payments paused" : live ? "Payout account ready" : "No Payout account yet"}
               </span>
             </CardFooter>
           </Card>
         </div>
       ) : (
-        <EmptyState icon={<Flag />} title="No active mission" description="A mission gives the operator a measurable goal and a budget ceiling. Nothing is spent without one." action={<LinkButton href="/app/missions" variant="primary">Create mission</LinkButton>} />
+        <EmptyState icon={<Flag />} title="No goal yet" description="Set what you want more of and a monthly budget. Nothing is spent without one." action={<LinkButton href="/onboarding?step=3" variant="primary">Set a goal</LinkButton>} />
       )}
 
       {issues.map((b) => (
@@ -247,7 +250,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
               ))}
             </ul>
           ) : (
-            <CardBody className="text-[12.5px] text-ink-3">No companies with buying intent yet. They appear as evidence is collected.</CardBody>
+            <CardBody className="text-[12.5px] text-ink-3">No companies looking to buy yet. They appear as scans find them.</CardBody>
           )}
         </Card>
 
@@ -305,7 +308,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
         <Card>
-          <CardHeader title="Experiment performance" description="Cost per qualified conversion, lower is better" action={more("/app/experiments", "Experiments")} />
+          <CardHeader title="How your tests are doing" description="Cost per result — lower is better" action={more("/app/experiments", "Tests")} />
           <CardBody>
             {sum?.findings.some((f) => f.cpaMicro != null) ? (
               <BarList
@@ -313,14 +316,14 @@ export default async function Overview({ searchParams }: { searchParams: Promise
                 rows={sum.findings.filter((f) => f.cpaMicro != null).map((f) => ({ label: f.label, value: f.cpaMicro!, sub: `${f.conversions} conv · ${f.verdict}`, tone: f.verdict === "STOP" || f.verdict === "REDUCE" ? "bad" : f.verdict === "SCALE" ? "good" : undefined }))}
               />
             ) : (
-              <p className="text-[12.5px] text-ink-3">No measured experiments yet.</p>
+              <p className="text-[12.5px] text-ink-3">No test results yet.</p>
             )}
           </CardBody>
           <CardFooter>From settled spend and referral-code attribution only.</CardFooter>
         </Card>
 
         <Card>
-          <CardHeader title="Recent agent decisions" action={more("/app/receipts", "Receipts")} />
+          <CardHeader title="What GrowTendril did recently" action={more("/app/receipts", "Receipts")} />
           {decisions.length ? (
             <ul className="divide-y divide-line">
               {decisions.map((d) => (
@@ -344,7 +347,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
               ))}
             </ul>
           ) : (
-            <CardBody className="text-[12.5px] text-ink-3">No decisions yet — run a cycle to let the agents evaluate opportunities.</CardBody>
+            <CardBody className="text-[12.5px] text-ink-3">Nothing yet. Scan for customers and GrowTendril will start suggesting what to do.</CardBody>
           )}
         </Card>
       </div>

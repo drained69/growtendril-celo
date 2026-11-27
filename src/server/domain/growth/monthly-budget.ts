@@ -71,6 +71,12 @@ export async function closeFinishedMonths(db: DB, projectId: string): Promise<nu
   return closed;
 }
 
+/** The spending rules a monthly budget implies, in the shape workspace activation takes. */
+export function rulesForBudget(c: BudgetChoice) {
+  const l = deriveLimits(c);
+  return { dailySpend: microToDecimal(l.dailySpendMicro), hardCeiling: microToDecimal(l.hardCeilingMicro), autonomousLimit: microToDecimal(l.autonomousLimitMicro) };
+}
+
 /** "This month: $X of $Y used · resets on <date>" — committed spend this month against its budget. */
 export async function monthUsage(db: DB, mission: Mission) {
   const { spent, pending } = await missionSpend(db, mission.id);

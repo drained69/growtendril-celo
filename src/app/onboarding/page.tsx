@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Check, FileText, Flag, Globe, Package, ShieldCheck, Target } from "lucide-react";
 import { requireUser, currentProject } from "@/server/auth/current";
 import { getDb, schema as s } from "@/server/db/client";
@@ -16,9 +16,9 @@ export const dynamic = "force-dynamic";
 
 const STEPS = [
   { label: "Product", sub: "What you sell" },
-  { label: "Customer", sub: "Profile & ICP" },
-  { label: "Mission", sub: "Goal & budget" },
-  { label: "Autonomy", sub: "Hard spending rules" },
+  { label: "Customer", sub: "Your ideal customer" },
+  { label: "Goal", sub: "Goal & monthly budget" },
+  { label: "Spending limits", sub: "What needs your OK" },
 ];
 
 export default async function Onboarding({ searchParams }: { searchParams: Promise<{ new?: string; step?: string; manual?: string; website?: string }> }) {
@@ -31,6 +31,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const step = !project ? 1 : sp.step === "3" ? 3 : Math.min(project.onboardingStep, 4);
   const [profile] = project ? await db.select().from(s.productProfiles).where(eq(s.productProfiles.projectId, project.id)) : [];
   const icps = project ? await db.select().from(s.icps).where(eq(s.icps.projectId, project.id)) : [];
+  const [mission] = project && step === 4 ? await db.select({ budgetMicro: s.missions.budgetMicro }).from(s.missions).where(and(eq(s.missions.projectId, project.id), eq(s.missions.status, "active"))) : [];
   const finished = !!project && project.onboardingStep >= 5;
   const canEdit = !cur || cur.role === "owner";
   const canPolicy = !cur || cur.role === "owner" || cur.role === "admin";
@@ -97,7 +98,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
 
         {step === 1 && !sp.manual && (
           <Card>
-            <CardHeader title="Find your first growth opportunity" description="Start with your website. Review the product profile and first goal, then run a market scan to find relevant customers and creators." icon={<Globe />} />
+            <CardHeader title="Find your first growth opportunity" description="Start with your website. You'll check what GrowTendril understood and your first goal, then scan for customers and creators." icon={<Globe />} />
             <QuickStartStep website={sp.website?.slice(0, 300)} />
             <CardFooter>
               <span>No website yet, or want to fill it in yourself?</span>
@@ -125,7 +126,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
           <div className="space-y-4">
             <Card>
               <CardHeader
-                title="Product intelligence profile"
+                title="Your product"
                 description="Correct anything that's wrong — this drives what GrowTendril searches for."
                 icon={<FileText />}
                 action={<Badge>{["claude", "gemini"].includes(profile.generatedBy) ? "AI draft" : "From your pages"}</Badge>}
@@ -148,9 +149,9 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
                 <div>
                   <div className="text-[13px] font-medium text-ink">Next: your ideal customer</div>
-                  <p className="text-[12px] text-ink-3">Save any edits first, then let GrowTendril propose ICP tiers from the profile.</p>
+                  <p className="text-[12px] text-ink-3">Save any changes first, then GrowTendril suggests who your best customers are.</p>
                 </div>
-                {canEdit ? <GenerateIcp /> : <span className="text-[12px] text-ink-3">Only the owner can propose the customer profile.</span>}
+                {canEdit ? <GenerateIcp /> : <span className="text-[12px] text-ink-3">Only the owner can set your ideal customer.</span>}
               </div>
             </Card>
           </div>
@@ -160,21 +161,21 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
           <div className="space-y-4">
             {icps.length > 0 && (
               <Card>
-                <CardHeader title="Proposed ideal customer profile" description="Edit freely — the agent qualifies companies against these." icon={<Target />} />
+                <CardHeader title="Your ideal customer" description="Change anything. GrowTendril uses this to judge whether a company is a good fit." icon={<Target />} />
                 <IcpForm icps={icps} disabled={!canEdit} />
               </Card>
             )}
             <Card>
-              <CardHeader title="Growth mission" description="A measurable goal and a USDC budget ceiling. Nothing is spent without one." icon={<Flag />} />
-              {canPolicy ? <MissionStep audience={profile?.audience} category={profile?.category} /> : <CardFooter>Only owners and admins can set missions.</CardFooter>}
+              <CardHeader title="Your goal and monthly budget" description="What you want more of, and the most GrowTendril may spend on it each month." icon={<Flag />} />
+              {canPolicy ? <MissionStep audience={profile?.audience} category={profile?.category} /> : <CardFooter>Only owners and admins can set the goal.</CardFooter>}
             </Card>
           </div>
         )}
 
         {step === 4 && (
           <Card>
-            <CardHeader title="Autonomy: the hard rules" description="Checked by a fixed rules engine on every action, not by a prompt, and enforced again by your workspace contract on Celo." icon={<ShieldCheck />} />
-            {canPolicy ? <AutonomyStep autopilot={AUTOPILOT_LABEL} billing={billingMode() !== "off"} /> : <CardFooter>Only owners and admins can activate the workspace.</CardFooter>}
+            <CardHeader title="Spending limits" description="Set from your monthly budget. They are checked on every payment, and your Payout account enforces them too." icon={<ShieldCheck />} />
+            {canPolicy ? <AutonomyStep autopilot={AUTOPILOT_LABEL} billing={billingMode() !== "off"} monthlyMicro={mission?.budgetMicro ?? 0} /> : <CardFooter>Only owners and admins can activate the workspace.</CardFooter>}
           </Card>
         )}
       </div>

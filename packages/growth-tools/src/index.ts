@@ -4,3 +4,4 @@ export * from "./policy.js";
 export * from "./evidence.js";
 export * from "./recipient.js";
 export * from "./escrow.js";
+export * from "./campaign-escrow.js";

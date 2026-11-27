@@ -13,7 +13,7 @@ export async function resolveApprovalAction(approvalId: string, resolution: "app
   try {
     const { project, db, user } = await guard("approve");
     const [ap] = await db.select().from(s.approvals).where(and(eq(s.approvals.id, approvalId), eq(s.approvals.projectId, project.id)));
-    if (!ap) return { ok: false, error: "Approval not found" };
+    if (!ap) return { ok: false, error: "This request is no longer waiting. Refresh the page to see where it went." };
     if (resolution === "approve" && ap.transactionId) {
       const [[tx], [wallet]] = await Promise.all([
         db.select().from(s.transactions).where(eq(s.transactions.id, ap.transactionId)),
@@ -25,7 +25,7 @@ export async function resolveApprovalAction(approvalId: string, resolution: "app
     const { log, push } = collector();
     const r = await resolveApproval(db, { approvalId, userId: user.id, resolution, modifiedAmount: amount || undefined, note: note?.slice(0, 500), log: push });
     revalidatePath("/app", "layout");
-    return { ok: true, data: r, log, message: r.status === "approved" ? "Approved and executed" : r.status === "denied" ? "Denied by a policy rule at re-check" : "Rejected" };
+    return { ok: true, data: r, log, message: r.status === "approved" ? "Paid — it shows in Activity with its receipt" : r.status === "denied" ? "Not paid: one of your limits stopped it when we checked again. Its receipt says which." : "Not paid" };
   } catch (e) {
     return fail(e);
   }

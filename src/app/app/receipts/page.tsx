@@ -26,7 +26,7 @@ export default async function Receipts() {
     <div className="space-y-4">
       <PageHeader
         title="Receipts"
-        description="A tamper-evident receipt for every agent decision: what it did, why, which policy rules ran, and the payment trace. Each body is hashed (sha256) and re-verified when opened."
+        description="A receipt for everything GrowTendril did or asked to do: what, why, and who said yes. Each one is fingerprinted, so you can tell if it was ever changed."
         meta={
           <>
             <ModeBadge mode={project.dataMode} />
@@ -36,26 +36,23 @@ export default async function Receipts() {
       />
 
       <StatStrip className="grid-cols-2 lg:grid-cols-4">
-        <Stat label="Receipts" value={rows.length} sub={`${rows.filter((x) => x.r.finalizedAt).length} finalized`} />
-        <Stat label="Allowed" value={count("ALLOW")} sub="within autonomous policy" tone={count("ALLOW") ? "good" : undefined} />
-        <Stat label="Needed approval" value={count("APPROVAL_REQUIRED")} sub="routed to a human" tone={count("APPROVAL_REQUIRED") ? "warn" : undefined} />
-        <Stat label="Denied" value={count("DENY")} sub="blocked by a rule" tone={count("DENY") ? "bad" : undefined} />
+        <Stat label="Receipts" value={rows.length} sub={`${rows.filter((x) => x.r.finalizedAt).length} finished`} />
+        <Stat label="Done on its own" value={count("ALLOW")} sub="within your limits" tone={count("ALLOW") ? "good" : undefined} />
+        <Stat label="Asked you first" value={count("APPROVAL_REQUIRED")} sub="waited for your OK" tone={count("APPROVAL_REQUIRED") ? "warn" : undefined} />
+        <Stat label="Stopped" value={count("DENY")} sub="by one of your limits" tone={count("DENY") ? "bad" : undefined} />
       </StatStrip>
 
       <Card>
-        <CardHeader title="Decision receipts" icon={<FileCheck2 />} />
+        <CardHeader title="All receipts" icon={<FileCheck2 />} />
         <DataTable
           searchable
           defaultSort={{ key: "number", dir: "desc" }}
           columns={[
-            { key: "number", label: "Decision", sortable: true, className: "w-24" },
-            { key: "kind", label: "Action", sortable: true },
-            { key: "agent", label: "Agent", sortable: true },
-            { key: "verdict", label: "Verdict", sortable: true },
-            { key: "cost", label: "Cost", align: "right", sortable: true },
-            { key: "state", label: "Outcome" },
-            { key: "mode", label: "Mode", sortable: true },
-            { key: "hash", label: "sha256" },
+            { key: "number", label: "No.", sortable: true, className: "w-20" },
+            { key: "kind", label: "What", sortable: true },
+            { key: "verdict", label: "Your limits", sortable: true },
+            { key: "cost", label: "Amount", align: "right", sortable: true },
+            { key: "state", label: "Result" },
             { key: "when", label: "When", sortable: true },
           ]}
           rows={rows.map(({ r, d }) => {
@@ -69,19 +66,13 @@ export default async function Receipts() {
                 kind: (
                   <span className="flex items-center gap-1.5 whitespace-nowrap">
                     {humanize(d.kind)}
-                    {!d.autonomous && <Badge tone="muted">human</Badge>}
+                    {!d.autonomous && <Badge tone="muted">asked you</Badge>}
                   </span>
                 ),
-                agent: <span className="text-ink-2">{d.agent}</span>,
                 verdict: <VerdictBadge verdict={d.policyVerdict} />,
                 cost: <span className="num">{cost != null ? fmtUsdc(cost) : <span className="text-ink-4">—</span>}</span>,
                 state: b.payment?.state ? <TxStateBadge state={b.payment.state} /> : <span className="text-[11.5px] text-ink-3">{humanize(d.status)}</span>,
-                mode: <ModeBadge mode={d.dataMode} />,
-                hash: (
-                  <code className="num text-[11px] text-ink-3" title={r.digest}>
-                    {shortHash(r.digest, 5)}
-                  </code>
-                ),
+
                 when: (
                   <span className="whitespace-nowrap text-ink-3" title={d.createdAt.toISOString()}>
                     {relTime(d.createdAt)}
@@ -92,9 +83,9 @@ export default async function Receipts() {
               search: `#${d.number} ${d.kind} ${d.agent} ${d.policyVerdict ?? ""} ${d.dataMode} ${r.digest} ${d.rationale}`,
             };
           })}
-          empty={<p className="text-center text-[12.5px] text-ink-3">No receipts yet. Every decision the agents make — buying data, proposing spend, reallocating budget — writes one. Run a cycle to start.</p>}
+          empty={<p className="text-center text-[12.5px] text-ink-3">No receipts yet. Everything GrowTendril does — buying research, suggesting a payment, moving budget between tests — leaves one. Scan for customers to start.</p>}
         />
-        <CardFooter>Digests are computed over the canonical JSON body; a mismatch on the detail page means the record was altered after it was written.</CardFooter>
+        <CardFooter>Open a receipt to see its proof. If its fingerprint doesn&apos;t match, the record was changed after it was written.</CardFooter>
       </Card>
     </div>
   );

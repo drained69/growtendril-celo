@@ -36,6 +36,26 @@ interface Payee {
 
 const humanize = (k: string) => k.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
+/** Why a payment waits for you, in plain words. The rule codes stay under "Details". */
+const WHY: Record<string, string> = {
+  PAYMENT_TO_PERSON: "this pays a person",
+  KOL_APPROVAL_THRESHOLD: "creator payments always ask you",
+  BOUNTY_APPROVAL_THRESHOLD: "bounty payments always ask you",
+  MAINNET_FOUNDER_APPROVAL: "you haven't let GrowTendril spend on its own",
+  CATEGORY_REQUIRES_APPROVAL: "this kind of spending always asks you",
+  MAX_TRANSACTION: "it's more than GrowTendril may spend on its own at once",
+  DAILY_SPEND: "it would go over today's limit",
+  CATEGORY_BUDGET: "it would go over this month's allowance for this kind of spending",
+  APPROVED_SERVICES: "this service isn't on your approved list",
+  REALLOCATION_SIZE: "it moves a large part of your budget",
+};
+function whyAsking(policy: Details["policy"]): string {
+  const rules = (policy ?? []).map((p) => p.rule);
+  if (rules.includes("PAYMENT_TO_PERSON")) return "We're asking because this pays a person.";
+  const reasons = [...new Set(rules.map((r) => WHY[r]).filter(Boolean))].filter((r) => r !== WHY.MAINNET_FOUNDER_APPROVAL || rules.length === 1);
+  return reasons.length ? `We're asking because ${reasons.slice(0, 2).join(", and ")}.` : "We're asking because it needs your OK.";
+}
+
 export default async function Approvals() {
   const { project, role, db, user } = await requireProject();
   const canApprove = can(role, "approve");
@@ -61,25 +81,25 @@ export default async function Approvals() {
     <div className="space-y-4">
       <PageHeader
         title="Approvals"
-        description="Payments that need your decision. Approving lets this one payment through; your per-payment ceiling, mission budget and freeze still apply. With a workspace contract, you sign each approval in your own wallet."
+        description="Payments waiting for your OK. Saying yes pays this one payment; your monthly budget, largest single payment and pause switch still apply. With a Payout account, you confirm each one in your own wallet."
         meta={
           <>
             <ModeBadge mode={project.dataMode} />
-            {pending.length ? <span>{pending.length} waiting</span> : <span>Inbox clear</span>}
+            {pending.length ? <span>{pending.length} waiting</span> : <span>Nothing waiting</span>}
           </>
         }
       />
 
       <StatStrip className="grid-cols-2 lg:grid-cols-4">
-        <Stat label="Waiting" value={pending.length} tone={pending.length ? "warn" : undefined} sub="pending decisions" />
-        <Stat label="Requested" value={fmtUsdc(pendingTotal, { unit: false })} sub="USDC awaiting you" />
-        <Stat label="Resolved" value={done.length} sub={`${done.filter((r) => r.a.status === "approved").length} approved · ${done.filter((r) => r.a.status === "rejected").length} rejected`} />
-        <Stat label="Approved spend" value={fmtUsdc(approvedTotal, { unit: false })} sub="USDC, all time" />
+        <Stat label="Waiting" value={pending.length} tone={pending.length ? "warn" : undefined} sub="for your OK" />
+        <Stat label="Asked for" value={fmtUsdc(pendingTotal, { unit: false })} sub="USDC waiting for you" />
+        <Stat label="Decided" value={done.length} sub={`${done.filter((r) => r.a.status === "approved").length} paid · ${done.filter((r) => r.a.status === "rejected").length} not paid`} />
+        <Stat label="Paid so far" value={fmtUsdc(approvedTotal, { unit: false })} sub="USDC, all time" />
       </StatStrip>
 
       {!canApprove && pending.length > 0 && (
         <Callout tone="info" title="View only">
-          Only workspace owners and admins can approve or reject spend. You can review the reasoning below.
+          Only owners and admins can say yes or no to payments. You can still read why each one was suggested.
         </Callout>
       )}
 
@@ -88,20 +108,17 @@ export default async function Approvals() {
           {pending.map(({ a, d }) => {
             const det = a.details as Details;
             const payee = a.transactionId ? payees.get(a.transactionId) : undefined;
+            const who = payee ? payee.label ?? "this person" : null;
             return (
               <Card key={a.id}>
                 <CardHeader
                   icon={<ShieldAlert />}
-                  title={
-                    <span className="flex items-center gap-2">
-                      {humanize(d.kind)} <span className="num font-normal text-ink-4">#{d.number}</span>
-                    </span>
-                  }
-                  description={`Proposed by the ${d.agent} agent · ${relTime(a.createdAt)}`}
+                  title={who ? `Pay ${who} ${fmtUsdc(a.requestedMicro)}?` : `${humanize(d.kind)} — ${fmtUsdc(a.requestedMicro)}?`}
+                  description={`Suggested by GrowTendril ${relTime(a.createdAt)}`}
                   action={
                     <>
                       <ModeBadge mode={d.dataMode} />
-                      <StatusBadge status="pending" label="Awaiting approval" />
+                      <StatusBadge status="pending" label="Waiting for you" />
                     </>
                   }
                 />
@@ -114,12 +131,13 @@ export default async function Approvals() {
                         <span className="ml-1 text-[13px] text-ink-3">USDC</span>
                       </div>
                     </div>
+                    <p className="rounded-[8px] bg-warning/[0.07] px-3 py-2 text-[13px] font-medium text-ink">{whyAsking(det.policy)}</p>
                     {det.rationale && <p className="text-[12.5px] leading-relaxed text-ink-2">{det.rationale}</p>}
                     {payee && <PayeePanel p={payee} />}
                     {det.delivery && <DeliveryPanel d={det.delivery} />}
                     {det.expectedOutcome && (
                       <div className="rounded-[8px] border border-line bg-bg/50 px-3 py-2 text-[12.5px]">
-                        <span className="label mr-2">Expected outcome</span>
+                        <span className="label mr-2">What it should bring</span>
                         <span className="text-ink">{det.expectedOutcome}</span>
                       </div>
                     )}
@@ -138,7 +156,7 @@ export default async function Approvals() {
                     )}
                     {det.evidence && det.evidence.length > 0 && (
                       <div>
-                        <div className="label mb-1.5">Evidence</div>
+                        <div className="label mb-1.5">What people said</div>
                         <ul className="space-y-1 text-[12.5px]">
                           {det.evidence.map((e) => (
                             <li key={e.url + e.title}>
@@ -155,14 +173,14 @@ export default async function Approvals() {
                   <div className="space-y-4 border-t border-line p-4 lg:border-l lg:border-t-0">
                     {det.confidence != null && (
                       <div className="flex items-center justify-between text-[12px]">
-                        <span className="text-ink-3">Agent confidence</span>
+                        <span className="text-ink-3">How sure GrowTendril is</span>
                         <Confidence value={det.confidence} />
                       </div>
                     )}
                     {(det.policy ?? []).length > 0 && (
-                      <div>
-                        <div className="label mb-1.5">Why it needs you</div>
-                        <ul className="space-y-1.5">
+                      <details>
+                        <summary className="cursor-pointer text-[12px] text-ink-3 hover:text-ink">Details: the checks behind this</summary>
+                        <ul className="mt-2 space-y-1.5">
                           {(det.policy ?? []).map((p) => (
                             <li key={p.rule} className="text-[12px] leading-snug">
                               <Badge tone="warn" className="num mr-1.5">
@@ -172,19 +190,19 @@ export default async function Approvals() {
                             </li>
                           ))}
                         </ul>
-                      </div>
+                      </details>
                     )}
                     <div className="border-t border-line pt-4">
                       {canApprove ? (
-                        <ApprovalControls id={a.id} requested={microToDecimal(a.requestedMicro)} onchain={onchainSends.has(a.transactionId ?? "")} attribution={attribution} />
+                        <ApprovalControls id={a.id} requested={microToDecimal(a.requestedMicro)} payee={who} onchain={onchainSends.has(a.transactionId ?? "")} attribution={attribution} />
                       ) : (
                         <p className="flex items-center gap-2 text-[12px] text-ink-3">
-                          <Lock className="size-3.5" /> Owner or admin required to resolve.
+                          <Lock className="size-3.5" /> An owner or admin decides this one.
                         </p>
                       )}
                     </div>
                     <Link href={`/app/receipts/${d.id}`} className="inline-flex items-center gap-1 text-[12px] text-ink-3 hover:text-ink">
-                      Decision receipt <ArrowUpRight className="size-3" />
+                      Receipt <ArrowUpRight className="size-3" />
                     </Link>
                   </div>
                 </div>
@@ -193,19 +211,19 @@ export default async function Approvals() {
           })}
         </div>
       ) : (
-        <EmptyState icon={<Inbox />} title="Nothing waiting for you" description="There are no pending payment requests. Creator payouts and research purchases that require your approval appear here with their recipient, amount and reason." />
+        <EmptyState icon={<Inbox />} title="Nothing waiting for you" description="When GrowTendril wants to pay a creator or buy something above your limits, it shows up here with who, how much and why." />
       )}
 
       <Card>
-        <CardHeader title="Resolved" description="Every approval keeps its receipt, amount and note" icon={<CheckCircle2 />} />
+        <CardHeader title="Decided" description="Every decision keeps its receipt, amount and note" icon={<CheckCircle2 />} />
         <DataTable
           columns={[
-            { key: "title", label: "Request" },
-            { key: "decision", label: "Decision", className: "w-20" },
+            { key: "title", label: "Payment" },
+            { key: "decision", label: "No.", className: "w-20" },
             { key: "amount", label: "Amount", align: "right", sortable: true },
-            { key: "status", label: "Outcome", sortable: true },
+            { key: "status", label: "What you decided", sortable: true },
             { key: "note", label: "Note" },
-            { key: "when", label: "Resolved", sortable: true },
+            { key: "when", label: "When", sortable: true },
           ]}
           defaultSort={{ key: "when", dir: "desc" }}
           searchable={done.length > 8}
@@ -233,7 +251,7 @@ export default async function Approvals() {
             sort: { amount: a.approvedMicro ?? a.requestedMicro, status: a.status, when: a.resolvedAt?.getTime() ?? 0 },
             search: `${a.title} ${a.status} ${a.note ?? ""} #${d.number}`,
           }))}
-          empty={<p className="text-center text-[12.5px] text-ink-3">No approvals resolved yet. Approved and rejected requests are kept here with their receipts.</p>}
+          empty={<p className="text-center text-[12.5px] text-ink-3">Nothing decided yet. Payments you say yes or no to are kept here with their receipts.</p>}
         />
       </Card>
     </div>
@@ -279,12 +297,12 @@ function PayeePanel({ p }: { p: Payee }) {
         <p className={recentChange ? "text-[12px] text-warning" : "text-[12px] text-ink-3"}>
           {p.ctx.setBy.replaced ? "Changed" : "Set"} {relTime(p.ctx.setBy.at)}
           {p.ctx.setBy.name ? ` by ${p.ctx.setBy.name}` : ""}
-          {p.ctx.setBy.replaced ? ` (replaced ${p.ctx.setBy.replaced.slice(0, 6)}…${p.ctx.setBy.replaced.slice(-4)})` : ""}. Confirm the address with the recipient through a channel you already trust before approving.
+          {p.ctx.setBy.replaced ? ` (replaced ${p.ctx.setBy.replaced.slice(0, 6)}…${p.ctx.setBy.replaced.slice(-4)})` : ""}. Check the address with the person through a channel you already trust before you pay.
         </p>
       )}
       {p.changedTo !== undefined && (
-        <Callout tone="danger" title="The payout address changed after this was proposed">
-          The experiment now pays {p.changedTo ?? "no address"}. Reject this request and propose the payment again so the new address gets its own review.
+        <Callout tone="danger" title="The address changed after this was suggested">
+          The test now pays {p.changedTo ?? "no address"}. Choose “Don't pay”, then suggest the payment again so the new address gets its own check.
         </Callout>
       )}
       {p.hold && <Callout tone="warn">{p.hold}</Callout>}
@@ -296,14 +314,14 @@ function DeliveryPanel({ d }: { d: NonNullable<Details["delivery"]> }) {
   return (
     <div className="space-y-1.5 rounded-[8px] border border-line px-3 py-2.5 text-[12.5px]">
       <span className="label flex items-center gap-1.5">
-        <PackageCheck className="size-3.5" /> Paid on delivery
+        <PackageCheck className="size-3.5" /> The work is live
       </span>
       <a href={d.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 break-all text-s1 hover:underline">
         {d.url} <ArrowUpRight className="size-3 shrink-0" />
       </a>
       <p className="text-ink-2">
         Recorded {relTime(new Date(d.recordedAt))}
-        {d.recordedBy ? ` by ${d.recordedBy}` : ""}. Since tranche 1: <span className="num text-ink">{d.visits}</span> tracked visit{d.visits === 1 ? "" : "s"}, <span className="num text-ink">{d.conversions}</span> {d.successEvent.replace(/_/g, " ")} event{d.conversions === 1 ? "" : "s"}.
+        {d.recordedBy ? ` by ${d.recordedBy}` : ""}. Since the first payment: <span className="num text-ink">{d.visits}</span> tracked visit{d.visits === 1 ? "" : "s"}, <span className="num text-ink">{d.conversions}</span> {d.successEvent.replace(/_/g, " ")} event{d.conversions === 1 ? "" : "s"}.
       </p>
       {d.visits === 0 && <p className="text-[12px] text-warning">No tracked visits yet — open the link and check the work is live and includes the tracked link.</p>}
     </div>

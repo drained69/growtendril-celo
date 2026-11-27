@@ -110,7 +110,7 @@ export default async function Creator({ params }: { params: Promise<{ id: string
                 ))}
               </ul>
             ) : (
-              <CardBody className="text-[12.5px] text-ink-3">No campaigns yet. Create an experiment from this creator’s opportunity to brief and pay them.</CardBody>
+              <CardBody className="text-[12.5px] text-ink-3">No tests with this creator yet. Make a test from their opportunity to brief and pay them.</CardBody>
             )}
           </Card>
         </div>

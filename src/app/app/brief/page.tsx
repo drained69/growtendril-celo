@@ -133,7 +133,7 @@ export default async function DailyBrief() {
                 </div>
               </>
             ) : (
-              <p className="text-[12.5px] text-ink-3">No active mission — set one to give the operator a budget.</p>
+              <p className="text-[12.5px] text-ink-3">No goal yet. Set a goal and monthly budget so GrowTendril knows what to aim for.</p>
             )}
           </CardBody>
         </Card>

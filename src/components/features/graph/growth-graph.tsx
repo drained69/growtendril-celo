@@ -131,7 +131,7 @@ export function GrowthGraph({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
               )}
             </div>
           ) : (
-            <p className="text-[12.5px] leading-relaxed text-ink-3">Click any node to trace it from product → market → opportunity → experiment → spend → result → learning, and open its evidence.</p>
+            <p className="text-[12.5px] leading-relaxed text-ink-3">Click anything to follow it from your product → the market → an opportunity → a test → what was spent → the result → what we learned, and open where it came from.</p>
           )}
           <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-line pt-3">
             {(Object.keys(TYPE_COLOR) as NodeType[]).map((t, it) => (

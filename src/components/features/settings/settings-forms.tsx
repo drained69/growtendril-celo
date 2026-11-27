@@ -120,7 +120,7 @@ type Icp = { id: string; tier: string; title: string; description: string; compa
 
 export function IcpForm({ icps, disabled }: { icps: Icp[]; disabled?: boolean }) {
   const [state, action, pending] = useActionState(saveIcpAction, null);
-  useResultToast(state, "ICP saved");
+  useResultToast(state, "Ideal customer saved");
   return (
     <form action={action} onSubmit={keepValues(action)}>
       <fieldset disabled={disabled} className="divide-y divide-line">
@@ -151,7 +151,7 @@ export function IcpForm({ icps, disabled }: { icps: Icp[]; disabled?: boolean })
           </div>
         ))}
       </fieldset>
-      <FormFooter pending={pending} label="Save ICP" disabled={disabled} state={state} />
+      <FormFooter pending={pending} label="Save ideal customer" disabled={disabled} state={state} />
     </form>
   );
 }

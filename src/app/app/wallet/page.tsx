@@ -59,10 +59,10 @@ export default async function WalletPage() {
     <PageHeader title="Payout account" description="The money that pays people, such as creators. It stays in an account only you control, and we ask you before paying any person."
       actions={<ActionButton action={refreshSettlementsAction} label="Check for payment updates" icon={<RefreshCw />} />} />
     <StatStrip className="grid-cols-2 lg:grid-cols-4">
-      <Stat label="In your account" value={usdcHeld == null ? "—" : fmtUsdc(Number(usdcHeld))} sub={contract ? `${usdtHeld ? fmtUsdc(Number(usdtHeld)).replace("USDC", "USD₮") : "0 USD₮"} for local-currency payouts` : wallet ? "Ready for approved payments" : "Not set up yet"} />
-      <Stat label="This month" value={month ? `${fmtUsdc(month.usedMicro, { unit: false })} of ${fmtUsdc(month.budgetMicro, { unit: false })}` : "—"} sub={month ? `USDC used · resets on ${resetLabel(month.resetsAt)}` : <Link className="underline" href="/onboarding?step=3">Set a goal and budget</Link>} />
-      <Stat label="Largest single payment" value={policy ? fmtUsdc(effectivePaymentCeiling(policy)) : "—"} sub={<Link className="underline" href="/app/settings#budget">Change in Settings</Link>} />
-      <Stat label="Paid today" value={fmtUsdc(spent)} sub="We ask you before every payment to a person" />
+      <Stat label="In your account" value={usdcHeld == null ? "—" : fmtUsdc(Number(usdcHeld), { unit: false })} sub={contract ? `USDC · plus ${usdtHeld ? fmtUsdc(Number(usdtHeld), { unit: false }) : "0"} USD₮ for local payouts` : wallet ? "USDC, ready for approved payments" : "Not set up yet"} />
+      <Stat label="Used this month" value={month ? fmtUsdc(month.usedMicro, { unit: false }) : "—"} sub={month ? `of ${fmtUsdc(month.budgetMicro, { unit: false })} USDC · resets on ${resetLabel(month.resetsAt)}` : <Link className="underline" href="/onboarding?step=3">Set a goal and budget</Link>} />
+      <Stat label="Largest single payment" value={policy ? fmtUsdc(effectivePaymentCeiling(policy), { unit: false }) : "—"} sub={<>USDC · <Link className="underline" href="/app/settings#budget">Change</Link></>} />
+      <Stat label="Paid today" value={fmtUsdc(spent, { unit: false })} sub="USDC · we ask before paying a person" />
     </StatStrip>
     {issue && <Callout tone="warn" title="Agent wallet setup incomplete">{issue}</Callout>}
     {!!balances.errors.length && <Callout tone="warn" title="We couldn't read your balance just now">Refresh the page to try again. <details className="mt-1 text-[12px] text-ink-3"><summary className="cursor-pointer">Details</summary>{balances.errors.join(" · ")}</details></Callout>}

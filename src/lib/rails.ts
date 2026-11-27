@@ -1,6 +1,6 @@
 /** How a payment moved, as shown to people. Older rail keys map to neutral labels. */
 export const RAIL_LABEL: Record<string, string> = {
-  growth_vault: "Workspace contract",
+  growth_vault: "Payout account (workspace contract)",
   textile_corridor: "Local-currency payout · Textile FX",
   celo_x402: "Paid research · x402",
   celo_usdc_send: "Agent wallet transfer",

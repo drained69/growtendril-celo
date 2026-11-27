@@ -64,7 +64,7 @@ export default async function Brief({ params, searchParams }: { params: Promise<
                 For experiment <span className="num text-ink-2">#{exp.number}</span> · {exp.title}
               </span>
             ) : (
-              <span>Not yet tied to an experiment</span>
+              <span>Not part of a test yet</span>
             )}
             <span className="text-ink-4">·</span>
             <span>{saved ? "Saved with campaign" : "Generated now"}</span>

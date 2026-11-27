@@ -167,7 +167,7 @@ curl -X POST ${endpoint} \\
       </div>
 
       <Card id="notifications">
-        <CardHeader title="Outbound notifications" description="Send approval, payment, operator cycle and creator post updates to Slack, Discord or a signed JSON endpoint." icon={<Webhook />} />
+        <CardHeader title="Outbound notifications" description="Send updates about approvals, payments, scans and creator posts to Slack, Discord or a signed JSON endpoint." icon={<Webhook />} />
         <CardBody><Notifications endpoints={notificationEndpoints} deliveries={notificationDeliveries.map((delivery) => ({ ...delivery, createdAt: delivery.createdAt.toISOString() }))} events={[...WEBHOOK_EVENTS]} canManage={canManage} /></CardBody>
       </Card>
 

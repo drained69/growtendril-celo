@@ -195,7 +195,7 @@ export default async function GrowthPlanPage() {
 
           <Card>
             <CardFooter>
-              <span>The plan rebuilds after every scan. Results decide where the budget goes: experiments that miss their stop rule are stopped and unspent budget moves to what works, through the same spending rules.</span>
+              <span>The plan rebuilds after every scan. Results decide where the budget goes: tests that miss their stop rule are stopped and their unspent budget moves to what works, within the same limits.</span>
             </CardFooter>
           </Card>
         </>

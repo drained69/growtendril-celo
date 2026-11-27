@@ -37,7 +37,7 @@ const CHORES = [
   "shortlist creators who post about your category", "flag suspicious creator engagement", "draft a first message", "write a campaign brief",
   "make a tracked link", "count who clicked", "compare two tests", "pause what isn't working",
   "write the morning brief", "pay a creator — after you approve", "keep the receipt", "score a lead's fit",
-  "find a creator's public email", "watch a launch thread", "refresh the influencer report", "flag a stale campaign",
+  "find a creator's public email", "watch a launch thread", "refresh the creator report", "flag a stale campaign",
 ];
 
 export function Chores() {
@@ -86,7 +86,7 @@ export function Trio() {
     <Section id="how" className="border-t-0">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <Reveal>
-          <Eyebrow>How a cycle works</Eyebrow>
+          <Eyebrow>How a scan works</Eyebrow>
           <Headline>
             Finds it. Checks it.
             <br />
@@ -584,7 +584,7 @@ export function Finale({ startHref, signedIn }: { startHref: string; signedIn: b
 
 export function Footer({ startHref, signedIn }: { startHref: string; signedIn: boolean }) {
   const cols: [string, [string, string][]][] = [
-    ["Product", [["What it does", "#product"], ["How a cycle works", "#how"], ["Creators", "#creators"], ["Pricing", "#pricing"]]],
+    ["Product", [["What it does", "#product"], ["How a scan works", "#how"], ["Creators", "#creators"], ["Pricing", "#pricing"]]],
     ["Trust", [["Your money", "#controls"], ["Receipts", "#receipts"], ["On your terms", "#terms"], ["Questions", "#faq"], ["Technical details", "#celo"], ["Open growth toolkit", "https://github.com/drained69/growtendril-celo/tree/main/packages/growth-tools"]]],
     ["Account", signedIn ? [["Open workspace", "/app"]] : [["Sign in", "/login"], ["Create account", "/signup"], ["Start free", startHref]]],
   ];

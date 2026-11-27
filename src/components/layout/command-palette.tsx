@@ -15,7 +15,7 @@ const ACTIONS: Cmd[] = [
   { id: "new-mission", label: "Start a new mission", group: "Actions", icon: Flag, href: "/onboarding?step=3", keywords: "goal budget" },
   { id: "connect", label: "Connect a data source", group: "Actions", icon: Plug, href: "/app/integrations", keywords: "x reddit youtube github api key" },
   { id: "invite", label: "Invite a teammate", group: "Actions", icon: UserPlus, href: "/app/team", keywords: "member" },
-  { id: "wallet", label: "Fund your workspace contract", group: "Actions", icon: Wallet, href: "/app/wallet", keywords: "deposit withdraw usdc contract" },
+  { id: "wallet", label: "Add money to your Payout account", group: "Actions", icon: Wallet, href: "/app/wallet", keywords: "deposit withdraw usdc contract" },
 ];
 
 /** ⌘K launcher for navigation and common actions. */

@@ -23,6 +23,13 @@
       "address": "0x41289019c57389874ee81600c605bdfea671ee5e",
       "transactionHash": "0xe149664a6d0042972ab4e9d28c2afa0cd1827abc866d1b87842e9bb1bdfec806",
       "block": 83739895
+    },
+    "CampaignEscrow": {
+      "address": "0xfbb1299540df7781a58563555c6429392de4859f",
+      "transactionHash": "0x92e7407bf25be1b6941185582dfbc4108160701785b855bbfab62e74c1a9c058",
+      "block": 83901263,
+      "deployer": "0xb630A602711b56B2b7AAfD0535E55a83387C7627",
+      "sourceSha256": "647d6702351e15e0b140cadb2ecd1a38e2d6f9c2207f1dd56c17cfdef032299e"
     }
   }
 }

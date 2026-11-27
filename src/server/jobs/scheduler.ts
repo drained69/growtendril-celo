@@ -39,6 +39,9 @@ export async function tick(db: DB, now = Date.now()) {
   }
   // Every transfer out of an agent wallet must belong to a recorded payment.
   for (const pid of await walletsToReconcile(db)) await enqueue(db, { kind: "wallet_reconcile", projectId: pid, dedupeKey: `wallet-reconcile:${pid}:${Math.floor(now / 1_800_000)}`, maxAttempts: 1 });
+  // Open campaigns: claim checks, agent approvals and payouts, once a minute while any campaign is running.
+  const [openCampaign] = await db.select({ id: s.openCampaigns.id }).from(s.openCampaigns).where(inArray(s.openCampaigns.status, ["live", "ended"])).limit(1);
+  if (openCampaign) await enqueue(db, { kind: "open_escrow_tick", dedupeKey: `open-escrow:${Math.floor(now / 60_000)}`, maxAttempts: 1 });
   // Housekeeping once a day.
   await enqueue(db, { kind: "cleanup", dedupeKey: `cleanup:${Math.floor(now / 86_400_000)}`, maxAttempts: 1 });
 }

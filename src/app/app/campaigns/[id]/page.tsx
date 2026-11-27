@@ -10,10 +10,13 @@ import { CampaignTerms } from "@/components/features/campaigns/terms";
 import { ActionButton } from "@/components/features/agent/action-button";
 import { verifyCreatorAction, proposeCreatorRewardAction, closeCreatorCampaignAction } from "@/server/actions/creator-campaigns";
 import { fmtUsdc } from "@/lib/money";
+import { OpenCampaignDashboard } from "@/components/features/campaigns/open-dashboard";
+import { appOrigin } from "@/server/lib/origin";
 export default async function Campaign({ params }: { params: Promise<{id:string}> }) {
   const { id } = await params, { db, project, role } = await requireProject();
-  const found = await db.select({ id:s.creatorPrograms.id }).from(s.creatorPrograms).where(and(eq(s.creatorPrograms.id,id),eq(s.creatorPrograms.projectId,project.id)));
+  const found = await db.select({ id:s.creatorPrograms.id, mode:s.creatorPrograms.mode }).from(s.creatorPrograms).where(and(eq(s.creatorPrograms.id,id),eq(s.creatorPrograms.projectId,project.id)));
   if (!found.length) notFound();
+  if (found[0].mode === "open") return <OpenCampaignDashboard db={db} projectId={project.id} programId={id} role={role} origin={await appOrigin()} />;
   const {program:p,experiment:e} = await programById(db,project.id,id);
   const [members, payments, outcomes, share, creators] = await Promise.all([
     campaignParticipants(db,id), campaignPayments(db,e.id), qualifiedOutcomes(db,id), observedMindshare(db,project.id,p,e),

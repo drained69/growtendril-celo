@@ -9,6 +9,8 @@ import { campaignPayments, qualifiedOutcomes } from "@/server/domain/growth/crea
 import { fmtUsdc } from "@/lib/money";
 import { appOrigin } from "@/server/lib/origin";
 import { CopyButton } from "@/components/ui/copy";
+import { myOpenJoins } from "@/server/domain/growth/open-campaigns";
+import { CLAIM_STATUS_FOR_PARTICIPANT } from "@/lib/open-campaigns";
 export const dynamic="force-dynamic";
 export default async function CreatorPortal() {
   const user=await requireUser(),db=await getDb(),origin=await appOrigin();
@@ -16,8 +18,10 @@ export default async function CreatorPortal() {
     .from(s.creatorParticipants).innerJoin(s.creatorPrograms,eq(s.creatorPrograms.id,s.creatorParticipants.programId)).innerJoin(s.experiments,eq(s.experiments.id,s.creatorPrograms.experimentId))
     .innerJoin(s.kols,eq(s.kols.id,s.creatorParticipants.kolId)).innerJoin(s.campaigns,eq(s.campaigns.id,s.creatorParticipants.campaignId))
     .leftJoin(s.creatorContributions,eq(s.creatorContributions.participantId,s.creatorParticipants.id)).where(eq(s.creatorParticipants.userId,user.id));
-  return <main className="mx-auto max-w-3xl space-y-6 p-5 py-10"><PageHeader title="Your creator campaigns" description={`Welcome, ${user.name}. Your agreed rewards, submitted work and payout progress.`} actions={<LinkButton href="/app">Business workspace</LinkButton>} />
-    {!rows.length && <Card><CardBody><p className="text-sm text-ink-3">You haven’t joined a campaign yet. Open the private invitation shared by the business to read its terms and participate.</p></CardBody></Card>}
+  const open=await myOpenJoins(db,user.id);
+  return <main className="mx-auto max-w-3xl space-y-6 p-5 py-10"><PageHeader title="Your campaigns" description={`Welcome, ${user.name}. Your rewards, your proof and when you get paid.`} actions={<LinkButton href="/app">Business workspace</LinkButton>} />
+    {open.map(({participant:p,campaign:c,business,claim})=><a key={p.id} href={`/creator/join/${c.slug}`} className="block"><Card interactive><CardBody><div className="flex justify-between gap-3"><h2 className="font-semibold">{c.title}</h2><StatusBadge status={claim?.status??"joined"} label={claim?CLAIM_STATUS_FOR_PARTICIPANT[claim.status]:"Joined, proof not sent yet"} /></div><p className="mt-1 text-sm text-ink-3">{business} · your code {p.code}</p></CardBody></Card></a>)}
+    {!rows.length && !open.length && <Card><CardBody><p className="text-sm text-ink-3">You haven’t joined a campaign yet. Open the link a business shared with you to read its terms and join.</p></CardBody></Card>}
     {await Promise.all(rows.map(async ({participant:p,program,experiment:e,creator,campaign,post})=>{
       const payments=await campaignPayments(db,e.id),tx=post?payments.filter(x=>x.action.contributionId===post.id).sort((a,b)=>b.transaction.createdAt.getTime()-a.transaction.createdAt.getTime())[0]?.transaction:null;
       const actions=(await qualifiedOutcomes(db,program.id)).filter(o=>o.participant===p.id).length;

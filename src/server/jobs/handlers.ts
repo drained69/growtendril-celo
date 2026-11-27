@@ -13,6 +13,7 @@ import { chargeService, checkOpenInvoices, expireInvoices, InsufficientCredit, r
 import { reconcileBillingPayments } from "@/server/domain/reconcile/billing";
 import { reconcileWalletOutflows } from "@/server/domain/reconcile/wallet";
 import { deliver } from "@/server/domain/notifications/webhooks";
+import { openEscrowTick } from "@/server/jobs/open-campaigns";
 
 /** One handler per job kind. Handlers must be idempotent: a retried job may run again. */
 export const HANDLERS: Record<string, (db: DB, job: Job) => Promise<Record<string, unknown>>> = {
@@ -99,6 +100,12 @@ export const HANDLERS: Record<string, (db: DB, job: Job) => Promise<Record<strin
   async billing_renewals(db) {
     await expireInvoices(db);
     return {};
+  },
+
+  /** Open campaigns: finish claim checks, set approved rewards aside on Celo, pay them after the hold. */
+  async open_escrow_tick(db) {
+    const r = await openEscrowTick(db);
+    return { ...r, errors: r.errors.slice(0, 10) };
   },
 
   /** Remove expired guest accounts (and their demo workspaces) after 7 days. */

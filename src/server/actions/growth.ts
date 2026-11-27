@@ -11,7 +11,7 @@ import { resolveApproval } from "@/server/domain/agent/execute";
 import { runLearning } from "@/server/domain/growth/learning-run";
 import { recordConversion } from "@/server/domain/growth/attribution";
 import { CONVERSION_EVENTS, GOAL_EVENTS } from "@/server/domain/growth/attribution-links";
-import { toMicro } from "@/lib/money";
+import { toMicro, microToDecimal } from "@/lib/money";
 import { collector, fail, guard, type ActionResult } from "@/server/actions/_common";
 
 export async function createExperimentAction(opportunityId: string): Promise<ActionResult<{ id: string }>> {
@@ -45,7 +45,13 @@ const ProposalEdit = z.object({
 export async function reviseExperimentProposalAction(experimentId: string, _: unknown, form: FormData): Promise<ActionResult> {
   try {
     const { project, db, user } = await guard("operate");
-    const raw = Object.fromEntries(["title", "hypothesis", "target", "action", "budget", "successEvent", "successTarget", "stopMaxCpa", "stopAfterSpend", "timeframeDays"].map((key) => [key, form.get(key)]));
+    const raw: Record<string, FormDataEntryValue | null> = Object.fromEntries(["title", "hypothesis", "target", "action", "budget", "successEvent", "successTarget", "stopMaxCpa", "stopAfterSpend", "timeframeDays"].map((key) => [key, form.get(key)]));
+    // "How it's paid": one payment, or half now and half when the work is live.
+    const payment = form.get("payment");
+    if ((payment === "one" || payment === "split") && typeof raw.budget === "string" && /^\d+(\.\d{1,6})?$/.test(raw.budget)) {
+      const budget = toMicro(raw.budget);
+      raw.stopAfterSpend = microToDecimal(payment === "one" ? budget : budget - Math.floor(budget / 2));
+    }
     const edit = ProposalEdit.parse(raw);
     await reviseExperimentProposal(db, { projectId: project.id, experimentId, actorId: user.id, edit: {
       title: edit.title, hypothesis: edit.hypothesis, target: edit.target, action: edit.action,
@@ -53,7 +59,7 @@ export async function reviseExperimentProposalAction(experimentId: string, _: un
       stopMaxCpaMicro: toMicro(edit.stopMaxCpa), stopAfterSpendMicro: toMicro(edit.stopAfterSpend), timeframeDays: edit.timeframeDays,
     } });
     revalidatePath("/app", "layout");
-    return { ok: true, message: "Proposal saved. Review the measurement and payment steps before starting" };
+    return { ok: true, message: "Test saved. Check how results are counted, then review and launch it." };
   } catch (e) {
     return fail(e);
   }
@@ -63,14 +69,14 @@ export async function launchExperimentAction(experimentId: string, tranche: "fir
   try {
     const { project, db } = await guard("operate");
     const [x] = await db.select().from(s.experiments).where(and(eq(s.experiments.id, experimentId), eq(s.experiments.projectId, project.id)));
-    if (!x) return { ok: false, error: "Experiment not found" };
-    if (x.channel === "creator_program") return { ok: false, error: "Manage this campaign and its rewards from Creator campaigns" };
+    if (!x) return { ok: false, error: "We couldn't find that test. Open it again from Tests." };
+    if (x.channel === "creator_program") return { ok: false, error: "Manage this campaign and its rewards from Campaigns." };
     const { log, push } = collector();
     const r = await launchExperiment(db, { projectId: project.id, experimentId, tranche, log: push });
     revalidatePath("/app", "layout");
-    if (r.verdict === "DENY") return { ok: false, error: `Blocked by your spending rules: ${r.message}. The receipt has every check.` };
-    if (r.state === "FAILED") return { ok: false, error: `Approved, but the payment failed: ${r.message}` };
-    return { ok: true, data: r, log, message: r.verdict === "APPROVAL_REQUIRED" ? "Sent to Approvals — payments to people always need your OK" : `Payment ${r.state.toLowerCase()}` };
+    if (r.verdict === "DENY") return { ok: false, error: `Your spending limits stopped this payment: ${r.message}. Its receipt lists every check.` };
+    if (r.state === "FAILED") return { ok: false, error: `You approved it, but the payment didn't go through: ${r.message}` };
+    return { ok: true, data: r, log, message: r.verdict === "APPROVAL_REQUIRED" ? "Waiting for your OK in Approvals. We always ask before paying a person." : `Payment ${r.state.toLowerCase()}` };
   } catch (e) {
     return fail(e);
   }

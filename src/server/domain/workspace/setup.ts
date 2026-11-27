@@ -10,6 +10,7 @@ import { billingMode } from "@/server/domain/billing";
 import { newId } from "@/server/lib/ids";
 import { toMicro } from "@/lib/money";
 import { DAY_MS } from "@/lib/time";
+import { SPEND_TYPES } from "@/lib/budget";
 
 /**
  * Workspace setup steps shared by the step-by-step onboarding and the one-link quick start,
@@ -49,10 +50,11 @@ export async function replaceIcps(db: DB, projectId: string, icps: IcpProposal[]
   });
 }
 
-/** Default split of a mission budget across spend categories. */
-export const BUDGET_SPLIT: Record<string, number> = { research: 0.04, services: 0.03, kol: 0.45, bounty: 0.1, content: 0.28, community: 0.1 };
-
-/** Pauses any active mission and starts a new one from a template. */
+/**
+ * Pauses any active goal and starts a new one from a template. Its budget is a monthly budget:
+ * every kind of spend may use all of it (spend by type is reported, never a limit), and when the
+ * period ends the next month starts with the same budget (see growth/monthly-budget.ts).
+ */
 export async function startMission(db: DB, a: { projectId: string; templateKey: string; goal: number; days: number; budget: string; dataMode?: "LIVE" | "TESTNET" | "SIMULATED" | "DEMO" }) {
   const t = missionTemplate(a.templateKey);
   if (!t) throw new Error("Unknown mission template");
@@ -80,13 +82,7 @@ export async function startMission(db: DB, a: { projectId: string; templateKey: 
     status: "active",
     dataMode: a.dataMode ?? "LIVE",
   });
-  const categories = Object.entries(BUDGET_SPLIT);
-  let allocated = 0;
-  await tx.insert(s.missionBudgets).values(categories.map(([category, pct], index) => {
-    const amount = index === categories.length - 1 ? budget - allocated : Math.floor(budget * pct);
-    allocated += amount;
-    return { id: newId(), missionId, category, allocatedMicro: amount };
-  }));
+  await tx.insert(s.missionBudgets).values(SPEND_TYPES.map((category) => ({ id: newId(), missionId, category, allocatedMicro: budget })));
   return { missionId, template: t };
   });
 }

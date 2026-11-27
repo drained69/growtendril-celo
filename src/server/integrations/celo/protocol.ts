@@ -14,6 +14,7 @@ import { operatorAccount, operatorProblem, operatorWalletClient, publicClient } 
 import { CELO, txExplorerUrl } from "./config";
 import { formatPayout, isPayoutToken, PAYOUT_TOKENS, USDT, type PayoutToken } from "./corridors";
 import { previewCorridor } from "./textile";
+import { BUDGET_PERIOD_MS } from "@/lib/budget";
 
 export const CATEGORIES = ["research", "services", "kol", "bounty", "content", "community", "treasury"] as const;
 export const INTENT_STATE = { None: 0, Pending: 1, Approved: 2, Executed: 3, Rejected: 4, Cancelled: 5 } as const;
@@ -45,16 +46,16 @@ export function onchainPolicy(p: {autonomyEnabled?: boolean; maxTransactionMicro
 
 /** What the owner can do about each refusal, in their terms rather than the contract's. */
 const REFUSAL_HELP: Record<string, string> = {
-  "hard ceiling": "This payment is above the per-payment ceiling in your workspace contract. Raise it in Settings, then publish the new rules on the Wallet page.",
-  "category not allowed": "Your workspace contract does not allow this kind of spending yet. Publish your current spending rules on the Wallet page.",
-  "mission inactive": "Your mission is not active in the workspace contract. Publish the current mission on the Wallet page.",
-  "mission budget": "This would go over the mission budget in your workspace contract. Start a mission with a larger budget, then publish it on the Wallet page.",
-  "experiment budget": "This would go over the experiment's budget. Increase the experiment budget or reduce the payment.",
-  "experiment inactive": "This experiment has been stopped in your workspace contract.",
-  "frozen": "Spending is frozen in your workspace contract. Resume it on the Wallet page.",
-  "not authorized": "GrowTendril's agent is not allowed to act on your workspace contract. Restore the agent on the Wallet page.",
-  "payee hold": "You added this recipient yourself less than 24 hours ago, so someone else must approve it or you can approve after the hold.",
-  "transfer failed": "The workspace contract does not hold enough funds for this payment. Deposit more on the Wallet page.",
+  "hard ceiling": "This payment is bigger than the largest single payment your Payout account allows. Raise it in Settings → Budget, then confirm it on the Payout account page.",
+  "category not allowed": "Your Payout account doesn't allow this kind of spending yet. Confirm your limits on the Payout account page.",
+  "mission inactive": "This month's budget isn't confirmed in your Payout account yet. Confirm it on the Payout account page.",
+  "mission budget": "This would go over this month's budget in your Payout account. Raise the monthly budget in Settings → Budget, then confirm it on the Payout account page.",
+  "experiment budget": "This would go over the test's budget. Raise the test's budget or lower the payment.",
+  "experiment inactive": "This test was stopped in your Payout account.",
+  "frozen": "Payments from your Payout account are paused. Turn them back on from the Payout account page.",
+  "not authorized": "GrowTendril isn't allowed to suggest payments from your Payout account. Give it access again on the Payout account page.",
+  "payee hold": "You added this recipient yourself less than 24 hours ago, so someone else must approve it, or you can approve after the hold.",
+  "transfer failed": "Your Payout account doesn't hold enough money for this payment. Add money on the Payout account page.",
 };
 
 /** Contract reverts are the protocol's policy decisions, so their short reason is safe and useful to show. */
@@ -330,7 +331,8 @@ export interface ProtocolView {
   factory: Address; ledger: Address; operator: Address | null; ref: Hex; attribution: Hex | null; workspace: Address | null;
   policy: {autonomyEnabled: boolean; maxTransaction: string; dailySpend: string; hardCeiling: string; autonomousCategories: number; approvalCategories: number};
   policyInSync: boolean; owner: Address | null; frozen: boolean; operatorActive: boolean; checkpoints: number;
-  mission: {id: Hex; name: string; budget: string; endsAt: string; goalHash: Hex; categories: number[]; budgets: string[]; published: boolean} | null;
+  /** budgetInSync: the published budget matches the current monthly budget. */
+  mission: {id: Hex; name: string; budget: string; endsAt: string; goalHash: Hex; categories: number[]; budgets: string[]; published: boolean; budgetInSync: boolean} | null;
   /** Token balances held by the contract, in micro-units, and the part reserved for open payments. */
   funds: {token: "USDC" | "USD₮"; address: Address; balance: string; reserved: string}[];
 }
@@ -341,7 +343,7 @@ export async function loadProtocolView(db: DB, project: {id: string}, wallet: {p
   const policy = onchainPolicy(policyRow);
   const workspace = wallet?.provider === "growth_vault" && wallet.address ? wallet.address as Address : null;
   const operator = operatorProblem() ? null : operatorAccount().address;
-  let policyInSync = false, owner: Address | null = null, frozen = false, operatorActive = false, published = false, checkpoints = 0;
+  let policyInSync = false, owner: Address | null = null, frozen = false, operatorActive = false, published = false, budgetInSync = false, checkpoints = 0;
   let funds: ProtocolView["funds"] = [];
   if (workspace) {
     const missionId = mission ? protocolId("mission", mission.id) : null;
@@ -358,7 +360,7 @@ export async function loadProtocolView(db: DB, project: {id: string}, wallet: {p
     ]);
     operatorActive = (operatorRoles & ROLE_OPERATOR) !== 0;
     policyInSync = current[0] === policy.autonomyEnabled && current[1] === policy.maxTransaction && current[2] === policy.dailySpend && current[3] === policy.hardCeiling && current[4] === policy.autonomousCategories && current[5] === policy.approvalCategories;
-    owner = currentOwner; frozen = isFrozen; published = !!onchainMission && onchainMission[3] !== 0n; checkpoints = Number(count); funds = held;
+    owner = currentOwner; frozen = isFrozen; published = !!onchainMission && onchainMission[3] !== 0n; budgetInSync = published && !!mission && onchainMission![0] === BigInt(mission.budgetMicro); checkpoints = Number(count); funds = held;
   }
   const budgets = mission ? await db.select().from(s.missionBudgets).where(eq(s.missionBudgets.missionId, mission.id)) : [];
   const allocated = budgets.filter((b) => CATEGORIES.includes(b.category as (typeof CATEGORIES)[number]));
@@ -366,6 +368,8 @@ export async function loadProtocolView(db: DB, project: {id: string}, wallet: {p
     ...protocol, operator, ref: workspaceRef(project.id), attribution: code && /^[a-z0-9_]{1,32}$/.test(code) ? toDataSuffix(code) as Hex : null, workspace,
     policy: {autonomyEnabled: policy.autonomyEnabled, maxTransaction: policy.maxTransaction.toString(), dailySpend: policy.dailySpend.toString(), hardCeiling: policy.hardCeiling.toString(), autonomousCategories: policy.autonomousCategories, approvalCategories: policy.approvalCategories},
     policyInSync, owner, frozen, operatorActive, checkpoints, funds,
-    mission: mission ? {id: protocolId("mission", mission.id), name: mission.name, budget: String(mission.budgetMicro), endsAt: String(Math.floor(mission.endsAt.getTime() / 1000)), goalHash: keccak256(toHex(canonical({name: mission.name, goal: mission.goalDescription, event: mission.goalEvent, target: mission.goalTarget}))), categories: allocated.map((b) => CATEGORIES.indexOf(b.category as (typeof CATEGORIES)[number])), budgets: allocated.map((b) => String(b.allocatedMicro)), published} : null,
+    // Onchain, every kind of spend may use the whole month, and a month stays open one extra period
+    // so tests that started in it can pay their second half; new tests always open in the current month.
+    mission: mission ? {id: protocolId("mission", mission.id), name: mission.name, budget: String(mission.budgetMicro), endsAt: String(Math.floor((mission.endsAt.getTime() + BUDGET_PERIOD_MS) / 1000)), goalHash: keccak256(toHex(canonical({name: mission.name, goal: mission.goalDescription, event: mission.goalEvent, target: mission.goalTarget}))), categories: allocated.map((b) => CATEGORIES.indexOf(b.category as (typeof CATEGORIES)[number])), budgets: allocated.map(() => String(mission.budgetMicro)), published, budgetInSync} : null,
   };
 }

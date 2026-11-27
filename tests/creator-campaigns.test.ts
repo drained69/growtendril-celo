@@ -73,8 +73,8 @@ describe("creator campaign economics",()=>{
     const id=await flow.createCreatorCampaign(db,"project","owner",{...input,slots:"10"});
     const {experiment}=await flow.programById(db,"project",id);
     const alloc=await db.select().from(s.missionBudgets).where(eq(s.missionBudgets.missionId,experiment.missionId));
-    expect(alloc.reduce((n,a)=>n+a.allocatedMicro,0)).toBe(200e6);
-    expect(alloc.find(a=>a.category==="kol")!.allocatedMicro).toBe(120e6);
+    // Every kind of spend may use the whole monthly budget; the mission total still protects reservations.
+    expect(alloc.every(a=>a.allocatedMicro===200e6)).toBe(true);
     await expect(flow.createCreatorCampaign(db,"project","owner",{...input,slots:"10"})).rejects.toThrow(/insufficient/);
     await flow.closeCreatorCampaign(db,"project","owner",id);
   });
@@ -166,8 +166,7 @@ describe("owner-configured creator campaign budgets",()=>{
     expect(program.slots).toBe(12);expect(program.baseMicro).toBe(25e6);
     expect(experiment.budgetMicro).toBe(600e6);
     const allocations = await db.select().from(s.missionBudgets).where(eq(s.missionBudgets.missionId,experiment.missionId));
-    expect(allocations.reduce((n,a)=>n+a.allocatedMicro,0)).toBe(1000e6);
-    expect(allocations.find(a=>a.category==="kol")!.allocatedMicro).toBe(600e6);
+    expect(allocations.every(a=>a.allocatedMicro===1000e6)).toBe(true);
     await expect(flow.createCreatorCampaign(db,projectId,"owner",{...terms,slots:"9"})).rejects.toThrow(/insufficient uncommitted/);
     await expect(flow.createCreatorCampaign(db,projectId,"owner",{...terms,slots:"1",base:"76"})).rejects.toThrow(/per-payment ceiling of 100 USDC/);
     expect((await flow.programById(db,projectId,realProgram)).experiment.budgetMicro).toBe(600e6);

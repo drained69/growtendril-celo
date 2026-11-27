@@ -1,3 +1,4 @@
+import { closeFinishedMonths, currentMonth } from "@/server/domain/growth/monthly-budget";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DB } from "@/server/db/client";
 import * as s from "@/server/db/schema";
@@ -28,7 +29,9 @@ export async function runCycle(db: DB, projectId: string, opts: { trigger?: "man
   const stats: Record<string, unknown> = {};
   try {
     const [project] = await db.select().from(s.projects).where(eq(s.projects.id, projectId));
-    const [mission] = await db.select().from(s.missions).where(and(eq(s.missions.projectId, projectId), eq(s.missions.status, "active")));
+    // A new month starts here if the last one ended; past months close once their tests finish.
+    const mission = await currentMonth(db, projectId);
+    await closeFinishedMonths(db, projectId);
 
     // DISCOVER + UNDERSTAND
     if (!project) throw new Error("Workspace not found");

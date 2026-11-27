@@ -30,14 +30,15 @@ describe("workspace and mission integrity", () => {
     expect((await db.select().from(s.icps).where(eq(s.icps.projectId, pid))).map((i) => i.title)).toEqual(["Home brewers"]);
   });
 
-  it("serializes concurrent missions and preserves every micro-USDC in budget allocation", async () => {
+  it("serializes concurrent missions and gives every kind of spend the whole budget", async () => {
     const pid = await createWorkspace(db, { userId: "setup-owner", name: "Mission integrity", description: "Coffee", onboardingStep: 4, analysis });
     const create = () => startMission(db, { projectId: pid, templateKey: "find_buyers", goal: 10, days: 14, budget: "0.000007" });
     await Promise.all([create(), create()]);
     const active = await db.select().from(s.missions).where(and(eq(s.missions.projectId, pid), eq(s.missions.status, "active")));
     expect(active).toHaveLength(1);
     const buckets = await db.select().from(s.missionBudgets).where(eq(s.missionBudgets.missionId, active[0].id));
-    expect(buckets.reduce((sum, b) => sum + b.allocatedMicro, 0)).toBe(active[0].budgetMicro);
+    expect(buckets.length).toBeGreaterThan(0);
+    expect(buckets.every((b) => b.allocatedMicro === active[0].budgetMicro)).toBe(true);
     await expect(startMission(db, { projectId: pid, templateKey: "find_buyers", goal: 10, days: 14, budget: "-1" })).rejects.toThrow();
     expect(await db.select().from(s.missions).where(and(eq(s.missions.projectId, pid), eq(s.missions.status, "active")))).toHaveLength(1);
   });

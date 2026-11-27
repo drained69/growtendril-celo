@@ -81,7 +81,7 @@ beforeAll(async () => {
   await db.insert(s.wallets).values({ id: "w1", projectId: "p1", provider: "celo_eoa", address: WALLET, circleWalletId: "cw", blockchain: "CELO", status: "ACTIVE", dataMode: "LIVE" });
 });
 
-async function experiment(id: string, number: number, budget = 30) {
+async function experiment(id: string, number: number, budget = 20) {
   await db.insert(s.experiments).values({
     id,
     projectId: "p1",
@@ -132,7 +132,8 @@ describe("payouts are settled only once Celo shows them", () => {
   });
 
   it("flags a payout where Celo shows a different amount, or money going elsewhere", async () => {
-    const { tx } = await payNext("exp-a", "u1", () => ({ status: "success", toRecipientMicro: usdc(4), elsewhere: [{ to: SWAPPED, amountMicro: usdc(1) }], blockNumber: 4_901n }));
+    await experiment("exp-f", 6, 10);
+    const { tx } = await payNext("exp-f", "u1", () => ({ status: "success", toRecipientMicro: usdc(4), elsewhere: [{ to: SWAPPED, amountMicro: usdc(1) }], blockNumber: 4_901n }));
     expect(tx).toMatchObject({ state: "EXCEPTION", chainCheck: "mismatch" });
     const [e] = await exceptions("payout_mismatch");
     expect(e).toMatchObject({ scope: "wallet", projectId: "p1", transactionId: tx.id, status: "open" });
@@ -215,7 +216,7 @@ describe("payee changes", () => {
 describe("the second tranche pays on delivery", () => {
   it("refuses tranche 2 until the delivered work is on record, then shows it to the approver", async () => {
     // exp-a: tranche 1 (10 USDC) is fully committed.
-    await expect(x.launchExperiment(db, { projectId: "p1", experimentId: "exp-a", tranche: "second" })).rejects.toThrow(/pays on delivery/);
+    await expect(x.launchExperiment(db, { projectId: "p1", experimentId: "exp-a", tranche: "second" })).rejects.toThrow(/paid when the work is live/);
     await expect(x.recordDelivery(db, { projectId: "p1", experimentId: "exp-a", userId: "u1", url: "not a link" })).rejects.toThrow(/full link/);
     await x.recordDelivery(db, { projectId: "p1", experimentId: "exp-a", userId: "u1", url: "https://example.test/posts/definitive-guide", note: "Live Tuesday" });
     const r = await x.launchExperiment(db, { projectId: "p1", experimentId: "exp-a", tranche: "second" });
@@ -230,7 +231,7 @@ describe("the second tranche pays on delivery", () => {
 
   it("only records delivery for a running experiment", async () => {
     await experiment("exp-e", 5);
-    await expect(x.recordDelivery(db, { projectId: "p1", experimentId: "exp-e", userId: "u1", url: "https://example.test/x" })).rejects.toThrow(/once the experiment is running/);
+    await expect(x.recordDelivery(db, { projectId: "p1", experimentId: "exp-e", userId: "u1", url: "https://example.test/x" })).rejects.toThrow(/once the test has started/);
   });
 });
 

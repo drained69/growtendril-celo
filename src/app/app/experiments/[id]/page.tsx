@@ -14,7 +14,7 @@ import { loadPolicy } from "@/server/domain/agent/ledger";
 import { DEFAULT_POLICY } from "@/server/domain/agent/policy";
 import { fmtUsdc } from "@/lib/money";
 import { relTime } from "@/lib/time";
-import { Badge, Card, CardBody, CardFooter, CardHeader, ExternalLink, KeyValue, LinkButton, ModeBadge, PageHeader, Progress, Stat, StatusBadge, Table, TxStateBadge, shortHash } from "@/components/ui";
+import { Badge, Callout, Card, CardBody, CardFooter, CardHeader, ExternalLink, KeyValue, LinkButton, ModeBadge, PageHeader, Progress, Stat, StatusBadge, Table, TxStateBadge, shortHash } from "@/components/ui";
 import { CopyButton, CopyField } from "@/components/ui/copy";
 import { EvidenceList } from "@/components/features/intel/evidence";
 import { ActionButton } from "@/components/features/agent/action-button";
@@ -67,14 +67,18 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
   const payable = isPayableAddress(recipient);
   const [{ committedMicro }, policy, delivery] = await Promise.all([experimentCommitted(db, x.id), loadPolicy(db, project.id).catch(() => DEFAULT_POLICY), deliveryEvidence(db, x)]);
   const firstEnd = Math.min(x.stopAfterSpendMicro, x.budgetMicro);
-  // The next payment: finish tranche 1 first, then tranche 2 — never more than the per-payment ceiling at once.
-  const next = committedMicro < firstEnd ? { tranche: "first" as const, amount: Math.min(firstEnd - committedMicro, policy.hardCeilingMicro) } : committedMicro < x.budgetMicro ? { tranche: "second" as const, amount: Math.min(x.budgetMicro - committedMicro, policy.hardCeilingMicro) } : null;
+  // A test pays once, or half now and half when the work is live — never more than two payments.
+  const split = firstEnd < x.budgetMicro;
+  const next = committedMicro < firstEnd ? { tranche: "first" as const, amount: firstEnd - committedMicro } : committedMicro < x.budgetMicro ? { tranche: "second" as const, amount: x.budgetMicro - committedMicro } : null;
+  // Said up front: a payment above the largest single payment is refused, not split further.
+  const tooBig = !!next && next.amount > policy.hardCeilingMicro;
+  const payLabel = (amount: number) => (split ? `Pay ${fmtUsdc(amount)} now` : `Pay ${fmtUsdc(amount)}`);
   const conv = funnel.find((f) => f.type === x.successEvent)?.n ?? 0;
   const origin = await appOrigin();
   const link = camp?.destinationUrl ? buildUtmUrl(camp.destinationUrl, { source: camp.utmSource, medium: camp.utmMedium, campaign: camp.utmCampaign, ref: camp.referralCode }) : null;
   const firstPaid = txs.some((t) => t.state !== "REJECTED" && t.state !== "DENIED" && t.state !== "FAILED");
   const operate = can(role, "operate");
-  // Tranche 2 pays on delivery: the link to the paid work has to be on record first.
+  // The second half is paid when the work is live: the link to it has to be on record first.
   const awaitingDelivery = next?.tranche === "second" && !delivery;
   const cpa = conv ? Math.round(spent / conv) : null;
   const overStop = cpa != null && spent >= x.stopAfterSpendMicro && cpa > x.stopMaxCpaMicro;
@@ -86,7 +90,7 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
     <div className="space-y-4">
       <PageHeader
         crumbs={[
-          { label: "Experiments", href: "/app/experiments" },
+          { label: "Tests", href: "/app/experiments" },
           { label: `#${x.number}`, href: `/app/experiments/${x.id}` },
         ]}
         title={
@@ -110,8 +114,8 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                 Creator brief
               </LinkButton>
             )}
-            {operate && x.status === "proposed" && payable && next && <ActionButton action={launchExperimentAction.bind(null, x.id, next.tranche)} label={`Launch — pay ${fmtUsdc(next.amount)}`} icon={<Rocket />} variant="primary" logTitle="Launch experiment" />}
-            {operate && x.status === "running" && firstPaid && !awaitingDelivery && next?.tranche === "second" && <ActionButton action={launchExperimentAction.bind(null, x.id, "second")} label="Release second tranche" icon={<Play />} logTitle="Second tranche" />}
+            {operate && x.status === "proposed" && payable && next && !tooBig && <ActionButton action={launchExperimentAction.bind(null, x.id, next.tranche)} label={`Launch — ${payLabel(next.amount).toLowerCase()}`} icon={<Rocket />} variant="primary" logTitle="Launch test" />}
+            {operate && x.status === "running" && firstPaid && !awaitingDelivery && next?.tranche === "second" && !tooBig && <ActionButton action={launchExperimentAction.bind(null, x.id, "second")} label={`Pay the second half — ${fmtUsdc(next.amount)}`} icon={<Play />} logTitle="Second half" />}
           </>
         }
       />
@@ -119,12 +123,12 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
           <Card>
-            <CardHeader title="Measured result" description="Spend from the ledger; conversions from attribution" icon={<Gauge />} action={outcome?.verdict ? <Badge tone={outcome.verdict === "SCALE" ? "good" : outcome.verdict === "STOP" || outcome.verdict === "REDUCE" ? "bad" : "neutral"}>{outcome.verdict}</Badge> : undefined} />
+            <CardHeader title="Results so far" description="What was paid, and the results counted through your tracked link or code" icon={<Gauge />} action={outcome?.verdict ? <Badge tone={outcome.verdict === "SCALE" ? "good" : outcome.verdict === "STOP" || outcome.verdict === "REDUCE" ? "bad" : "neutral"}>{outcome.verdict}</Badge> : undefined} />
             <CardBody className="space-y-4">
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <Stat label="Spent" value={fmtUsdc(spent, { unit: false })} sub={`of ${fmtUsdc(x.budgetMicro, { unit: false })} USDC`} />
-                <Stat label="Conversions" value={conv} sub={EVENT_LABEL[x.successEvent as ConversionEventType] ?? x.successEvent} />
-                <Stat label="CPA" value={cpa != null ? fmtUsdc(cpa, { unit: false }) : "—"} sub={`stop above ${fmtUsdc(x.stopMaxCpaMicro, { unit: false })}`} tone={overStop ? "bad" : undefined} />
+                <Stat label="Results" value={conv} sub={EVENT_LABEL[x.successEvent as ConversionEventType] ?? x.successEvent} />
+                <Stat label="Cost per result" value={cpa != null ? fmtUsdc(cpa, { unit: false }) : "—"} sub={`stop above ${fmtUsdc(x.stopMaxCpaMicro, { unit: false })}`} tone={overStop ? "bad" : undefined} />
                 <Stat label="vs target" value={`${conv}/${x.successTarget}`} sub={`${Math.round((conv / Math.max(1, x.successTarget)) * 100)}% of goal`} tone={conv >= x.successTarget ? "good" : undefined} />
               </div>
               <div>
@@ -132,8 +136,8 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                   <span>Budget used</span>
                   <span className="num">{Math.round((spent / Math.max(1, x.budgetMicro)) * 100)}%</span>
                 </div>
-                <Progress value={spent} max={x.budgetMicro} marker={x.stopAfterSpendMicro} />
-                <div className="mt-1 text-[11px] text-ink-4">Marker: stop condition is evaluated after {fmtUsdc(x.stopAfterSpendMicro)}</div>
+                <Progress value={spent} max={x.budgetMicro} marker={split ? x.stopAfterSpendMicro : undefined} />
+                {split && <div className="mt-1 text-[11px] text-ink-4">Marker: the first half ({fmtUsdc(x.stopAfterSpendMicro)}). The rest is paid when the work is live.</div>}
               </div>
               {funnel.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
@@ -147,7 +151,7 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                 <p className="text-[12px] text-ink-3">No attributed events yet — they arrive through the tracked link, the conversion webhook, or conversions you record by hand with this campaign’s referral code.</p>
               )}
               {(manual?.n ?? 0) > 0 && <p className="text-[11.5px] text-ink-3">{manual!.n} of these were recorded by hand (self-reported).</p>}
-              <p className="text-[12px] text-ink-3">These are observed referrals, not proof that this experiment caused each outcome. If outcome tracking is not connected, a zero here is not evidence that the work failed.</p>
+              <p className="text-[12px] text-ink-3">These are people who arrived through this test&apos;s link or code. That doesn&apos;t prove the test caused every result, and if tracking isn&apos;t connected yet, a zero doesn&apos;t mean it failed.</p>
               {camp?.destinationUrl && <LinkButton href={`/app/customer-value/${x.id}`} variant="ghost" size="sm">Inspect customer value and receipts</LinkButton>}
               {outcome?.reason && (
                 <p className="rounded-[8px] border border-line bg-bg/50 px-3 py-2 text-[12.5px] text-ink-2">
@@ -159,22 +163,23 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
           </Card>
 
           <Card>
-            <CardHeader title="Review the proposal" description="The work and stop rule you are agreeing to" icon={<Beaker />} />
+            <CardHeader title="What you're agreeing to" description="The work, the budget, and how it's paid" icon={<Beaker />} />
             <CardBody>
               <KeyValue
                 items={[
-                  { k: "Hypothesis", v: <span className="block max-w-xl text-left">{x.hypothesis}</span> },
-                  { k: "Target", v: x.target },
-                  { k: "Action", v: <span className="block max-w-xl text-left">{x.action}</span> },
-                  { k: "Budget", v: <span className="num">{fmtUsdc(x.budgetMicro)} <span className="text-ink-3">· {x.budgetCategory}</span></span> },
-                  { k: "Timeframe", v: `${x.timeframeDays} days` },
-                  { k: "Success metric", v: `${x.successTarget} × ${EVENT_LABEL[x.successEvent as ConversionEventType] ?? x.successEvent}` },
-                  { k: "Stop condition", v: <span className="num">CPA &gt; {fmtUsdc(x.stopMaxCpaMicro)} after {fmtUsdc(x.stopAfterSpendMicro)}</span> },
+                  { k: "What we expect", v: <span className="block max-w-xl text-left">{x.hypothesis}</span> },
+                  { k: "Who it should reach", v: x.target },
+                  { k: "The work", v: <span className="block max-w-xl text-left">{x.action}</span> },
+                  { k: "Budget", v: <span className="num">{fmtUsdc(x.budgetMicro)}</span> },
+                  { k: "How it's paid", v: split ? <span className="num">Half now ({fmtUsdc(firstEnd)}), half when the work is live ({fmtUsdc(x.budgetMicro - firstEnd)})</span> : "In one payment" },
+                  { k: "How long", v: `${x.timeframeDays} days` },
+                  { k: "Success means", v: `${x.successTarget} × ${EVENT_LABEL[x.successEvent as ConversionEventType] ?? x.successEvent}` },
+                  { k: "Stop rule", v: <span className="num">Stop if each result costs more than {fmtUsdc(x.stopMaxCpaMicro)}</span> },
                 ]}
               />
               {operate && x.status === "proposed" && txs.length === 0 && <details className="mt-4 rounded-[9px] border border-line bg-bg/30 p-4">
-                <summary className="cursor-pointer text-[12.5px] font-medium text-ink">Edit this proposal before starting</summary>
-                <div className="pt-4"><ProposalForm proposal={x} /></div>
+                <summary className="cursor-pointer text-[12.5px] font-medium text-ink">Change this test before it starts</summary>
+                <div className="pt-4"><ProposalForm proposal={x} largestPaymentMicro={policy.hardCeilingMicro} /></div>
               </details>}
             </CardBody>
           </Card>
@@ -229,13 +234,13 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                 </tbody>
               </Table>
             ) : (
-              <CardBody className="text-[12.5px] text-ink-3">{x.status === "proposed" ? "No payments yet — launching pays the first tranche." : "No payments recorded for this experiment."}</CardBody>
+              <CardBody className="text-[12.5px] text-ink-3">{x.status === "proposed" ? (split ? "No payments yet. Launching pays the first half." : "No payments yet. Launching pays the test in one payment.") : "No payments for this test yet."}</CardBody>
             )}
           </Card>
 
           {ev.length > 0 && (
             <Card>
-              <CardHeader title="Evidence behind this experiment" description={`${ev.length} source${ev.length === 1 ? "" : "s"}`} icon={<Search />} />
+              <CardHeader title="Why we suggested this test" description={`${ev.length} source${ev.length === 1 ? "" : "s"}`} icon={<Search />} />
               <CardBody>
                 <EvidenceList items={ev} />
               </CardBody>
@@ -306,7 +311,7 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                 )}
               </>
             ) : (
-              <CardBody className="text-[12.5px] text-ink-3">No campaign yet. One is created with a referral code when the experiment launches.</CardBody>
+              <CardBody className="text-[12.5px] text-ink-3">No tracked link yet. One is made, with a code people can quote, when the test launches.</CardBody>
             )}
           </Card>
 
@@ -320,12 +325,18 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
           )}
 
           <Card>
-            <CardHeader title="Run" icon={<Rocket />} />
+            <CardHeader title="Review and launch" icon={<Rocket />} />
             <CardBody className="space-y-3">
+              {tooBig && next && !["succeeded", "failed", "stopped"].includes(x.status) && (
+                <Callout tone="warn" title="This payment is bigger than your largest single payment">
+                  It would be {fmtUsdc(next.amount)}, and your largest single payment is {fmtUsdc(policy.hardCeilingMicro)}. A test pays at most twice, so{" "}
+                  {can(role, "manage_policy") ? <Link href="/app/settings#budget" className="underline">raise the largest single payment</Link> : "ask an owner or admin to raise the largest single payment"} or lower this test&apos;s budget.
+                </Callout>
+              )}
               {!operate ? (
-                <p className="text-[12.5px] text-ink-3">Viewers can’t launch experiments.</p>
+                <p className="text-[12.5px] text-ink-3">Viewers can’t launch tests.</p>
               ) : ["succeeded", "failed", "stopped"].includes(x.status) ? (
-                <p className="text-[12.5px] text-ink-3">This experiment is {x.status}.{outcome?.reason ? ` ${outcome.reason}.` : ""}</p>
+                <p className="text-[12.5px] text-ink-3">This test is {x.status}.{outcome?.reason ? ` ${outcome.reason}.` : ""}</p>
               ) : (
                 <>
                   {payable && (
@@ -343,7 +354,7 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                   )}
                   {x.status === "awaiting_approval" && (
                     <p className="text-[12.5px] text-ink-2">
-                      The first payment is waiting for your decision in{" "}
+                      The first payment is waiting for your OK in{" "}
                       <Link href="/app/approvals" className="text-ink underline">
                         Approvals
                       </Link>
@@ -352,23 +363,23 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                   )}
                   {committedMicro > 0 && (
                     <div className="text-[11.5px] text-ink-3">
-                      Paid or awaiting approval: <span className="num text-ink-2">{fmtUsdc(committedMicro)}</span> of <span className="num">{fmtUsdc(x.budgetMicro)}</span>
+                      Paid or waiting for your OK: <span className="num text-ink-2">{fmtUsdc(committedMicro)}</span> of <span className="num">{fmtUsdc(x.budgetMicro)}</span>
                     </div>
                   )}
-                  {x.status === "proposed" && payable && next && (
-                    <ActionButton action={launchExperimentAction.bind(null, x.id, next.tranche)} label={`Launch — pay ${fmtUsdc(next.amount)}`} icon={<Rocket />} variant="primary" logTitle="Launch experiment" className="w-full" />
+                  {x.status === "proposed" && payable && next && !tooBig && (
+                    <ActionButton action={launchExperimentAction.bind(null, x.id, next.tranche)} label={`Launch — ${payLabel(next.amount).toLowerCase()}`} icon={<Rocket />} variant="primary" logTitle="Launch test" className="w-full" />
                   )}
                   {x.status === "running" && payable && next && awaitingDelivery && (
                     <p className="rounded-[8px] border border-line bg-bg/50 px-3 py-2 text-[12.5px] text-ink-2">
-                      Tranche 2 ({fmtUsdc(x.budgetMicro - committedMicro)}) pays on delivery. Record the link to the delivered work under <span className="text-ink">Delivery</span> to release it.
+                      The second half ({fmtUsdc(x.budgetMicro - committedMicro)}) is paid when the work is live. Add the link to the finished work under <span className="text-ink">Is the work live?</span> to pay it.
                     </p>
                   )}
-                  {x.status === "running" && payable && next && !awaitingDelivery && (
+                  {x.status === "running" && payable && next && !awaitingDelivery && !tooBig && (
                     <ActionButton
                       action={launchExperimentAction.bind(null, x.id, next.tranche)}
-                      label={next.tranche === "first" ? (firstPaid ? `Pay the rest of tranche 1 — ${fmtUsdc(next.amount)}` : `Fund it — pay ${fmtUsdc(next.amount)}`) : `Release tranche 2 — ${fmtUsdc(next.amount)}`}
+                      label={next.tranche === "first" ? (firstPaid ? `Pay the rest of the first half — ${fmtUsdc(next.amount)}` : payLabel(next.amount)) : `Pay the second half — ${fmtUsdc(next.amount)}`}
                       icon={next.tranche === "first" ? <Rocket /> : <Play />}
-                      logTitle={next.tranche === "first" ? "Fund experiment" : "Second tranche"}
+                      logTitle={next.tranche === "first" ? "Pay test" : "Second half"}
                       className="w-full"
                     />
                   )}
@@ -388,18 +399,18 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                   {x.status === "proposed" && (
                     <ActionButton action={startExperimentAction.bind(null, x.id)} label="Run it myself — no payment" icon={<Hand />} logTitle="Start experiment" className="w-full" />
                   )}
-                  <ActionButton action={stopExperimentAction.bind(null, x.id)} label="Stop experiment" icon={<CircleStop />} variant="ghost" confirm="Stop this experiment? Any payment still waiting for approval is rejected." className="w-full" />
+                  <ActionButton action={stopExperimentAction.bind(null, x.id)} label="Stop this test" icon={<CircleStop />} variant="ghost" confirm="Stop this test? Any payment still waiting for your OK is cancelled." className="w-full" />
                 </>
               )}
               <p className="text-[11.5px] leading-relaxed text-ink-3">
-                Every payment follows your spending rules and requires approval. Tranche 1 ({fmtUsdc(firstEnd)}) is the amount at risk before the stop condition is evaluated; tranche 2 pays once the delivered work is on record. No single payment exceeds your workspace ceiling of {fmtUsdc(policy.hardCeilingMicro)}. Running it yourself costs nothing: share the tracked link and record results here.
+                We ask you before every payment to a person. {split ? `Half (${fmtUsdc(firstEnd)}) is paid at launch and the rest when the work is live.` : "It's paid in one payment at launch."} No single payment can be more than your largest single payment of {fmtUsdc(policy.hardCeilingMicro)}. Running it yourself costs nothing: share the tracked link and record results here.
               </p>
             </CardBody>
           </Card>
 
           {(delivery || (x.status === "running" && firstPaid)) && (
             <Card>
-              <CardHeader title="Delivery" description="Tranche 2 pays once the paid work exists" icon={<PackageCheck />} action={delivery ? <Badge tone="good">Recorded</Badge> : <Badge tone="warn">Waiting</Badge>} />
+              <CardHeader title="Is the work live?" description={split ? "The second half is paid once the finished work is live" : "Where the finished work lives"} icon={<PackageCheck />} action={delivery ? <Badge tone="good">Link added</Badge> : <Badge tone="warn">Waiting</Badge>} />
               <CardBody className="space-y-3">
                 {delivery ? (
                   <>
@@ -410,11 +421,11 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                     <KeyValue
                       items={[
                         { k: "Recorded", v: `${relTime(new Date(delivery.recordedAt))}${delivery.recordedBy ? ` by ${delivery.recordedBy}` : ""}` },
-                        { k: "Tracked visits since tranche 1", v: <span className="num">{delivery.visits}</span> },
+                        { k: "Tracked visits since the first payment", v: <span className="num">{delivery.visits}</span> },
                         { k: EVENT_LABEL[x.successEvent as ConversionEventType] ?? x.successEvent, v: <span className="num">{delivery.conversions}</span> },
                       ]}
                     />
-                    {delivery.visits === 0 && <p className="text-[11.5px] text-ink-3">No tracked visits yet. Check the post includes the tracked link before releasing tranche 2.</p>}
+                    {delivery.visits === 0 && <p className="text-[11.5px] text-ink-3">No tracked visits yet. Check the post includes the tracked link before paying the second half.</p>}
                     {operate && x.status === "running" && (
                       <details>
                         <summary className="cursor-pointer text-[11.5px] text-ink-3 hover:text-ink">Change the link</summary>
@@ -427,7 +438,7 @@ export default async function Experiment({ params }: { params: Promise<{ id: str
                 ) : operate ? (
                   <DeliveryForm experimentId={x.id} url={null} note={null} />
                 ) : (
-                  <p className="text-[12.5px] text-ink-3">Waiting for someone to record the delivered work.</p>
+                  <p className="text-[12.5px] text-ink-3">Waiting for someone to add the link to the finished work.</p>
                 )}
               </CardBody>
             </Card>

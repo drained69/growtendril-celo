@@ -5,6 +5,7 @@ import { categorySpend, missionSpend } from "@/server/domain/agent/ledger";
 import { missionPerformance, missionProgress } from "@/server/domain/growth/attribution";
 import { cpa, evaluateExperiments, growthEfficiency } from "@/server/domain/growth/learning";
 import { DAY_MS } from "@/lib/time";
+import { currentMonth } from "@/server/domain/growth/monthly-budget";
 
 export const CATEGORY_LABEL: Record<string, string> = { research: "Research", services: "Services", kol: "Creators", bounty: "Bounties", content: "Content", community: "Community", treasury: "Treasury" };
 
@@ -44,8 +45,8 @@ export async function missionSummary(db: DB, mission: typeof s.missions.$inferSe
   };
 }
 
+/** The current goal and its monthly budget. Starts the next month if the last one has ended. */
 export async function activeMission(db: DB, projectId: string) {
-  const [m] = await db.select().from(s.missions).where(and(eq(s.missions.projectId, projectId), eq(s.missions.status, "active")));
-  return m ?? null;
+  return currentMonth(db, projectId);
 }
 

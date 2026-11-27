@@ -196,7 +196,8 @@ export async function loadPolicyState(db: DB, opts: { projectId: string; mission
     spentTodayMicro: (await spentToday(db, opts.projectId)) - selfSpentToday,
     missionBudgetMicro: mission?.budgetMicro ?? 0,
     missionCommittedMicro: ms.spent + ms.pending - self,
-    missionActive: mission?.status === "active",
+    // A past month ("closing") may still pay the tests that started in it, inside its own budget; nothing new.
+    missionActive: mission?.status === "active" || (mission?.status === "closing" && !!experiment && ["awaiting_approval", "running"].includes(experiment.status)),
     categoryAllocatedMicro: alloc?.allocatedMicro ?? 0,
     categoryCommittedMicro: (await categorySpend(db, opts.missionId, opts.category)) - self,
     serviceKnown: opts.serviceKnown,

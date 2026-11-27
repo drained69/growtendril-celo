@@ -10,6 +10,8 @@ import { proposeFinancialAction, type ProposalOutcome } from "@/server/domain/ag
 import type { Logger } from "@/server/domain/intel/analyze";
 import { utmSlug } from "@/server/domain/growth/attribution-links";
 import { CELO } from "@/server/integrations/celo/config";
+import { currentMonth } from "@/server/domain/growth/monthly-budget";
+import { defaultTestBudgetMicro, paymentPlan } from "@/lib/budget";
 
 /**
  * STRATEGIST — turns an opportunity into a measurable experiment:
@@ -35,6 +37,7 @@ export function experimentRecipient(exp: { recipientAddress: string | null }, ko
 }
 
 export async function createExperimentFromOpportunity(db: DB, p: { projectId: string; opportunityId: string; runId?: string | null; log?: Logger; budgetMicro?: number }) {
+  await currentMonth(db, p.projectId);
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`financial:${p.projectId}`}))`);
     return createExperimentLocked(tx as unknown as DB, p);
@@ -69,11 +72,11 @@ async function createExperimentLocked(db: DB, p: Parameters<typeof createExperim
   switch (opp.type) {
     case "KOL":
       t = {
-        title: `Creator campaign — @${kol?.handle}`,
+        title: `Creator test — @${kol?.handle}`,
         hypothesis: `A campaign by @${kol?.handle} around "${opp.title.split(" — ")[1] ?? "our category"}" will bring qualified ${visitors} that convert to ${goalLabel}.`,
         channel: "kol",
         category: "kol",
-        action: `Brief @${kol?.handle} with an evidence-backed angle; pay in two tranches (second once the post is live and recorded, and only if the stop condition is not hit).`,
+        action: `Brief @${kol?.handle} with an angle backed by what your customers said. Pay once the terms are agreed; if the payment is split, the second half is paid when the post is live.`,
         budget: p.budgetMicro ?? Math.max(opp.estimatedCostMicro, toMicro(50)),
         successEvent: mission.goalEvent,
         days: 7,
@@ -117,17 +120,21 @@ async function createExperimentLocked(db: DB, p: Parameters<typeof createExperim
         days: 7,
       };
   }
-  // Never commit more than the mission has uncommitted: total − spent − pending − reserved by live experiments.
+  // Never commit more than the month has left: budget − spent − pending − reserved by live tests.
   const { spent, pending } = await missionSpend(db, mission.id);
   const live = await db.select().from(s.experiments).where(and(eq(s.experiments.missionId, mission.id), inArray(s.experiments.status, ["proposed", "awaiting_approval", "running"])));
   let reserved = 0;
   for (const x of live) reserved += Math.max(0, x.budgetMicro - (await experimentCommitted(db, x.id)).committedMicro);
   const uncommitted = mission.budgetMicro - spent - pending - reserved;
-  if (uncommitted < toMicro(5)) throw new Error(`Only ${fmtUsdc(Math.max(0, uncommitted))} of the mission budget is uncommitted — stop or finish an experiment first`);
+  if (uncommitted < toMicro(5)) throw new Error(`Only ${fmtUsdc(Math.max(0, uncommitted))} of this month's budget is left. Finish or stop a test, or raise the monthly budget in Settings.`);
+  // A test's default budget is what one test needs, paid in at most two payments, never more than the month has left.
+  const ceiling = await loadPolicy(db, p.projectId).then((x) => x.hardCeilingMicro).catch(() => toMicro(10));
+  if (p.budgetMicro === undefined) t.budget = Math.min(uncommitted, Math.max(toMicro(5), defaultTestBudgetMicro({ leftThisMonthMicro: uncommitted, largestPaymentMicro: ceiling, suggestedMicro: t.budget })));
   if (t.budget > uncommitted) {
-    log("strategist", `Budget trimmed from ${fmtUsdc(t.budget)} to the ${fmtUsdc(uncommitted)} still uncommitted`);
+    log("strategist", `Budget lowered from ${fmtUsdc(t.budget)} to the ${fmtUsdc(uncommitted)} left this month`);
     t.budget = Math.floor(uncommitted / 10_000) * 10_000;
   }
+  const plan = paymentPlan(t.budget, ceiling);
   const successTarget = t.successEvent === "demo_request" ? 1 : Math.max(2, Math.ceil(t.budget / (plannedCpa * 6)));
   const stopMaxCpa = t.successEvent === "demo_request" ? t.budget : plannedCpa * 6;
   const number = await nextNumber(db, "experiments", p.projectId);
@@ -154,7 +161,8 @@ async function createExperimentLocked(db: DB, p: Parameters<typeof createExperim
       successEvent: t.successEvent,
       successTarget,
       stopMaxCpaMicro: stopMaxCpa,
-      stopAfterSpendMicro: Math.round(t.budget / 2),
+      // One payment, or half now and half when the work is live.
+      stopAfterSpendMicro: plan.firstMicro,
       timeframeDays: t.days,
       status: "proposed",
       evidenceIds: evidenceRows.map((e) => e.id).slice(0, 10),
@@ -184,18 +192,17 @@ async function createExperimentLocked(db: DB, p: Parameters<typeof createExperim
     agent: "strategist",
     kind: "create_experiment",
     action: { action: "create_experiment", opportunityId: opp.id, experimentId: exp.id, budgetMicro: t.budget },
-    rationale: `Opportunity #${opp.number} reached ${(opp.confidence * 100).toFixed(0)}% confidence with ${opp.expectedValue} expected value. Converted into experiment #${number} with a stop condition so no more than ${fmtUsdc(exp.stopAfterSpendMicro)} is at risk before evidence comes in.`,
+    rationale: `Opportunity #${opp.number} reached ${(opp.confidence * 100).toFixed(0)}% confidence with ${opp.expectedValue} expected value. Turned into test #${number}: ${plan.payments === 1 ? `one payment of ${fmtUsdc(t.budget)}` : `${fmtUsdc(plan.firstMicro)} now and ${fmtUsdc(plan.secondMicro)} when the work is live`}.`,
     inputs: { confidenceBefore: opp.confidence, reasons: opp.whyNow },
     status: "executed",
     dataMode: opp.dataMode,
   });
   await writeReceipt(db, d.id);
-  log("strategist", `Experiment #${number}: ${t.title} — budget ${fmtUsdc(t.budget)}, success ${successTarget} × ${t.successEvent}, stop if CPA > ${fmtUsdc(stopMaxCpa)} after ${fmtUsdc(exp.stopAfterSpendMicro)}`);
+  log("strategist", `Test #${number}: ${t.title} — budget ${fmtUsdc(t.budget)} (${plan.payments === 1 ? "one payment" : "half now, half when live"}), aiming for ${successTarget} × ${t.successEvent.replace(/_/g, " ")}${plan.fits ? "" : ` — needs a largest single payment of ${fmtUsdc(plan.neededLargestMicro)}`}`);
   return exp;
 }
 
-/** Launch: pay the first tranche (50% of budget) through the policy engine. */
-/** What an experiment has paid or committed so far (settled, in flight, or waiting for approval). */
+/** What a test has paid or committed so far (settled, in flight, or waiting for approval). */
 export async function experimentCommitted(db: DB, experimentId: string): Promise<{ committedMicro: number; attempts: number }> {
   const txs = await db.select({ amount: s.transactions.amountMicro, state: s.transactions.state }).from(s.transactions).where(eq(s.transactions.experimentId, experimentId));
   const live = new Set<string>([...SPENT_STATES, ...PENDING_STATES, "PROPOSED"]);
@@ -222,16 +229,16 @@ export async function reviseExperimentProposal(db: DB, p: { projectId: string; e
     const work = tx as unknown as DB;
     const [exp] = await work.select().from(s.experiments).where(and(eq(s.experiments.id, p.experimentId), eq(s.experiments.projectId, p.projectId)));
     if (!exp) throw new Error("Experiment not found");
-    if (exp.channel === "creator_program") throw new Error("Edit creator campaign terms from Creator campaigns");
-    if (exp.status !== "proposed") throw new Error("Only a proposed experiment can be edited");
+    if (exp.channel === "creator_program") throw new Error("Edit creator campaign terms from Campaigns");
+    if (exp.status !== "proposed") throw new Error("Only a test that hasn't started can be edited");
     const { attempts } = await experimentCommitted(work, exp.id);
     if (attempts) throw new Error("A payment was already attempted. Create a fresh proposal rather than changing its reviewed terms");
     const [mission] = await work.select().from(s.missions).where(and(eq(s.missions.id, exp.missionId), eq(s.missions.projectId, p.projectId), eq(s.missions.status, "active")));
-    if (!mission) throw new Error("This experiment no longer has an active mission");
+    if (!mission) throw new Error("This test belongs to a month that has ended. Start a fresh test from Opportunities.");
     const e = p.edit;
     if (!Number.isSafeInteger(e.budgetMicro) || e.budgetMicro < toMicro(5)) throw new Error("Budget must be at least 5 USDC");
-    if (!Number.isSafeInteger(e.stopAfterSpendMicro) || e.stopAfterSpendMicro < 1 || e.stopAfterSpendMicro > e.budgetMicro) throw new Error("Stop-after spend must be greater than zero and no more than the budget");
-    if (!Number.isSafeInteger(e.stopMaxCpaMicro) || e.stopMaxCpaMicro < 1) throw new Error("Maximum cost per outcome must be greater than zero");
+    if (!Number.isSafeInteger(e.stopAfterSpendMicro) || e.stopAfterSpendMicro < 1 || e.stopAfterSpendMicro > e.budgetMicro) throw new Error("The first payment must be more than $0 and no more than the budget");
+    if (!Number.isSafeInteger(e.stopMaxCpaMicro) || e.stopMaxCpaMicro < 1) throw new Error("The stop rule's cost per result must be more than $0");
     if (!Number.isSafeInteger(e.successTarget) || e.successTarget < 1 || e.successTarget > 100_000) throw new Error("Target count must be between 1 and 100,000");
     if (!Number.isSafeInteger(e.timeframeDays) || e.timeframeDays < 1 || e.timeframeDays > 90) throw new Error("Timeframe must be between 1 and 90 days");
     const { spent, pending } = await missionSpend(work, mission.id);
@@ -242,7 +249,7 @@ export async function reviseExperimentProposal(db: DB, p: { projectId: string; e
       reserved += Math.max(0, other.budgetMicro - (await experimentCommitted(work, other.id)).committedMicro);
     }
     const available = Math.max(0, mission.budgetMicro - spent - pending - reserved);
-    if (e.budgetMicro > available) throw new Error(`Only ${fmtUsdc(available)} is uncommitted in this mission. Reduce this experiment's budget or finish another one first`);
+    if (e.budgetMicro > available) throw new Error(`Only ${fmtUsdc(available)} is left this month. Lower this test's budget, finish another test, or raise the monthly budget in Settings.`);
     await work.update(s.experiments).set({ ...e, updatedAt: new Date() }).where(eq(s.experiments.id, exp.id));
     await work.update(s.campaigns).set({ name: e.title }).where(eq(s.campaigns.experimentId, exp.id));
     await audit(work, { projectId: p.projectId, actorType: "user", actorId: p.actorId, action: "experiment.proposal_revised", target: exp.id, data: { previousBudgetMicro: exp.budgetMicro, budgetMicro: e.budgetMicro, previousSuccessEvent: exp.successEvent, successEvent: e.successEvent, previousTarget: exp.successTarget, successTarget: e.successTarget } });
@@ -250,12 +257,18 @@ export async function reviseExperimentProposal(db: DB, p: { projectId: string; e
   });
 }
 
+/**
+ * The next payment of a test. A test pays at most twice: its first part at launch (the whole
+ * budget, or half), and the rest when the work is live. A part above the largest single payment
+ * is refused up front rather than split into more payments.
+ */
 export async function nextInstallment(db: DB, exp: { id: string; budgetMicro: number; stopAfterSpendMicro: number }, tranche: "first" | "second", ceilingMicro: number) {
   const { committedMicro, attempts } = await experimentCommitted(db, exp.id);
   const end = tranche === "second" ? exp.budgetMicro : Math.min(exp.stopAfterSpendMicro, exp.budgetMicro);
   const due = end - committedMicro;
-  if (due <= 0) throw new Error(tranche === "first" ? "The first tranche is already paid or waiting for approval. Release the second tranche once results justify it." : "This experiment's whole budget is already paid or waiting for approval.");
-  return { amount: Math.min(due, ceilingMicro), installment: attempts + 1, dueMicro: due };
+  if (due <= 0) throw new Error(tranche === "first" ? "The first payment is already made or waiting for your OK. The rest is paid when the work is live." : "This test's whole budget is already paid or waiting for your OK.");
+  if (due > ceilingMicro) throw new Error(`This payment would be ${fmtUsdc(due)}, but your largest single payment is ${fmtUsdc(ceilingMicro)}. A test pays at most twice, so raise the largest single payment in Settings → Budget or lower this test's budget.`);
+  return { amount: due, installment: attempts + 1, dueMicro: due };
 }
 
 /**
@@ -266,7 +279,7 @@ export async function nextInstallment(db: DB, exp: { id: string; budgetMicro: nu
 export async function recordDelivery(db: DB, v: { projectId: string; experimentId: string; userId: string; url: string; note?: string | null }) {
   const [exp] = await db.select().from(s.experiments).where(and(eq(s.experiments.id, v.experimentId), eq(s.experiments.projectId, v.projectId)));
   if (!exp) throw new Error("experiment not found");
-  if (exp.status !== "running") throw new Error(exp.status === "proposed" || exp.status === "awaiting_approval" ? "Record delivery once the experiment is running." : `This experiment is ${exp.status}.`);
+  if (exp.status !== "running") throw new Error(exp.status === "proposed" || exp.status === "awaiting_approval" ? "Add the link once the test has started." : `This test is ${exp.status}.`);
   let url: URL;
   try {
     url = new URL(v.url.trim());
@@ -317,23 +330,22 @@ async function launchExperimentLocked(db: DB, p: Parameters<typeof launchExperim
   const [exp] = await db.select().from(s.experiments).where(and(eq(s.experiments.id, p.experimentId), eq(s.experiments.projectId, p.projectId)));
   if (!exp) throw new Error("experiment not found");
   if (exp.channel === "creator_program") throw new Error("Review and pay individual posts from Creator campaigns");
-  if (!["proposed", "awaiting_approval", "running"].includes(exp.status)) throw new Error(`This experiment is ${exp.status}; it cannot receive another payment`);
+  if (!["proposed", "awaiting_approval", "running"].includes(exp.status)) throw new Error(`This test is ${exp.status}, so it can't pay anything more.`);
   // Tranche 2 pays on delivery.
   const delivery = p.tranche === "second" ? await deliveryEvidence(db, exp) : null;
-  if (p.tranche === "second" && !delivery) throw new Error("Tranche 2 pays on delivery. Record the link to the delivered work (the post, article or merged PR) on this experiment first.");
+  if (p.tranche === "second" && !delivery) throw new Error("The second half is paid when the work is live. Add the link to the finished work (the post, article or merged PR) on this test first.");
   const [campaign] = await db.select().from(s.campaigns).where(eq(s.campaigns.experimentId, exp.id));
   const kol = campaign?.kolId ? (await db.select().from(s.kols).where(eq(s.kols.id, campaign.kolId)))[0] : undefined;
   const [opp] = exp.opportunityId ? await db.select().from(s.opportunities).where(eq(s.opportunities.id, exp.opportunityId)) : [];
   const evidence = exp.evidenceIds.length ? await db.select().from(s.evidence).where(inArray(s.evidence.id, exp.evidenceIds)) : [];
-  // Each tranche is paid in installments no larger than the per-payment ceiling, counting what is
-  // already paid or waiting for approval, so a 15 USDC tranche under a 10 USDC ceiling is 10 + 5.
+  // Each part is one payment within the largest single payment, counting what is already paid or waiting.
   const { amount, installment } = await nextInstallment(db, exp, p.tranche ?? "first", (await loadPolicy(db, p.projectId)).hardCeilingMicro);
   const purpose = exp.channel === "kol" ? "kol_payment" : exp.channel === "bounty" ? "developer_bounty" : exp.channel === "community" ? "partner_incentive" : "campaign_payment";
   const res = await proposeFinancialAction(db, {
     projectId: p.projectId,
     runId: p.runId,
     agent: "operator",
-    title: exp.channel === "kol" ? `KOL campaign — @${kol?.handle}` : exp.title,
+    title: exp.channel === "kol" ? `Creator test — @${kol?.handle}` : exp.title,
     input: {
       action: "send_payment",
       purpose,
@@ -348,11 +360,11 @@ async function launchExperimentLocked(db: DB, p: Parameters<typeof launchExperim
       missionId: exp.missionId,
       confidence: opp?.confidence ?? 0.7,
     },
-    rationale: `${p.tranche === "second" ? "Second" : "First"} tranche for experiment #${exp.number}: ${exp.hypothesis}`,
+    rationale: `${p.tranche === "second" ? "Second half" : exp.stopAfterSpendMicro >= exp.budgetMicro ? "Payment" : "First half"} for test #${exp.number}: ${exp.hypothesis}`,
     reasons: [
-      ...(delivery ? [`Delivered: ${delivery.url} — ${delivery.visits} tracked visit${delivery.visits === 1 ? "" : "s"} and ${delivery.conversions} ${delivery.successEvent.replace(/_/g, " ")} event${delivery.conversions === 1 ? "" : "s"} since tranche 1`] : []),
+      ...(delivery ? [`The work is live: ${delivery.url} — ${delivery.visits} tracked visit${delivery.visits === 1 ? "" : "s"} and ${delivery.conversions} ${delivery.successEvent.replace(/_/g, " ")} event${delivery.conversions === 1 ? "" : "s"} since the first payment`] : []),
       ...(opp?.whyNow ?? []).slice(0, 3),
-      `Stop condition: CPA > ${fmtUsdc(exp.stopMaxCpaMicro)} after ${fmtUsdc(exp.stopAfterSpendMicro)}`,
+      `Stop rule: stop if each result costs more than ${fmtUsdc(exp.stopMaxCpaMicro)}`,
     ],
     details: { tranche: p.tranche ?? "first", delivery },
     expectedOutcome: `${exp.successTarget}+ ${exp.successEvent.replace(/_/g, " ")} (${exp.target})`,

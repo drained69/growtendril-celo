@@ -19,11 +19,13 @@ import { CopyField } from "@/components/ui/copy";
 import { ActionButton } from "@/components/features/agent/action-button";
 import { LedgerExceptions } from "@/components/features/wallet/ledger-exceptions";
 import { UsdcHelp } from "@/components/features/billing/usdc-help";
+import { monthUsage } from "@/server/domain/growth/monthly-budget";
+import { resetLabel } from "@/lib/budget";
 import { WithdrawForm } from "@/components/features/wallet/withdraw-form";
 import { withdrawable } from "@/server/domain/agent/withdraw";
 import { exceptionsFor } from "@/server/domain/reconcile/exceptions";
 import { spentTodayMicro } from "@/server/queries/activity";
-import { activeMission, missionSummary } from "@/server/queries/missions";
+import { activeMission } from "@/server/queries/missions";
 import { effectivePaymentCeiling } from "@/server/domain/agent/policy";
 
 export default async function WalletPage() {
@@ -36,7 +38,6 @@ export default async function WalletPage() {
   ]);
   const balances = await walletBalances(wallet);
   const live = walletIsLive(wallet);
-  const summary = mission ? await missionSummary(db, mission) : null;
   const owner = can(role, "manage_workspace");
   // A workspace contract withdraws from its own panel, signed by the owner's wallet.
   const withdrawal = owner && live && wallet?.provider !== "altana" && wallet?.provider !== "growth_vault" ? await withdrawable(db, project.id).catch(() => null) : null;
@@ -51,60 +52,60 @@ export default async function WalletPage() {
   const usdtHeld = contractFunds.find((f) => f.token === "USD₮")?.balance;
   // An Altana wallet has its own card below; only a server-held wallet gets this one.
   const showServerWallet = (!!wallet?.address && !contract && wallet.provider !== "altana") || (!wallet && !protocol && operatorWorkspace);
+  const month = mission ? await monthUsage(db, mission) : null;
+  const otherOption = !wallet && !!protocol;
+  const altanaCard = <AltanaWallet address={wallet?.address ?? null} canManage={manage} workspaceName={project.name} session={session ? {id: session.id, publicKey: session.publicKey, capUsd: fmtUsdc(session.capMicro), period: session.period, expiresAt: session.expiresAt.toISOString(), grantTxHash: session.grantTxHash, revokeTxHash: session.revokeTxHash} : null} />;
   return <div className="space-y-4">
     <PageHeader title="Payout account" description="The money that pays people, such as creators. It stays in an account only you control, and we ask you before paying any person."
       actions={<ActionButton action={refreshSettlementsAction} label="Check for payment updates" icon={<RefreshCw />} />} />
-    <UsdcHelp />
     <StatStrip className="grid-cols-2 lg:grid-cols-4">
-      <Stat label={contract ? "Contract USDC" : "Wallet USDC"} value={usdcHeld == null ? "—" : fmtUsdc(Number(usdcHeld))} sub={contract ? `${usdtHeld ? fmtUsdc(Number(usdtHeld)).replace("USDC", "USD₮") : "0 USD₮"} for local payouts` : wallet ? "Celo balance" : "No wallet yet"} />
-      <Stat label="Spent today" value={fmtUsdc(spent)} sub={`Daily limit ${fmtUsdc(policy?.dailySpendMicro ?? 0)}`} />
-      <Stat label="Per-payment limit" value={policy ? fmtUsdc(effectivePaymentCeiling(policy)) : "—"} sub={<Link className="underline" href="/app/settings">Change in Settings</Link>} />
-      <Stat label="Mission remaining" value={mission && summary ? fmtUsdc(mission.budgetMicro - summary.spent) : "—"} sub="After committed spend" />
+      <Stat label="In your account" value={usdcHeld == null ? "—" : fmtUsdc(Number(usdcHeld))} sub={contract ? `${usdtHeld ? fmtUsdc(Number(usdtHeld)).replace("USDC", "USD₮") : "0 USD₮"} for local-currency payouts` : wallet ? "Ready for approved payments" : "Not set up yet"} />
+      <Stat label="This month" value={month ? `${fmtUsdc(month.usedMicro, { unit: false })} of ${fmtUsdc(month.budgetMicro, { unit: false })}` : "—"} sub={month ? `USDC used · resets on ${resetLabel(month.resetsAt)}` : <Link className="underline" href="/onboarding?step=3">Set a goal and budget</Link>} />
+      <Stat label="Largest single payment" value={policy ? fmtUsdc(effectivePaymentCeiling(policy)) : "—"} sub={<Link className="underline" href="/app/settings#budget">Change in Settings</Link>} />
+      <Stat label="Paid today" value={fmtUsdc(spent)} sub="We ask you before every payment to a person" />
     </StatStrip>
     {issue && <Callout tone="warn" title="Agent wallet setup incomplete">{issue}</Callout>}
-    {!!balances.errors.length && <Callout tone="warn" title="Balance unavailable">{balances.errors.join(" · ")}</Callout>}
-    {wallet?.frozen && <Callout tone="danger" title="Spending is frozen" action={manage && !contract ? <ActionButton action={toggleFreezeAction} label="Resume spending" icon={<Unlock />} /> : undefined}>{contract ? "Every payment is refused until you resume spending in your workspace contract below." : "Every spend is denied until a wallet manager resumes it."}</Callout>}
+    {!!balances.errors.length && <Callout tone="warn" title="We couldn't read your balance just now">Refresh the page to try again. <details className="mt-1 text-[12px] text-ink-3"><summary className="cursor-pointer">Details</summary>{balances.errors.join(" · ")}</details></Callout>}
+    {wallet?.frozen && <Callout tone="danger" title="Payments are paused" action={manage && !contract ? <ActionButton action={toggleFreezeAction} label="Turn payments back on" icon={<Unlock />} /> : undefined}>{contract ? "Nothing can be paid until you turn payments back on in your Payout account below." : "Nothing can be paid until an owner or admin turns payments back on."}</Callout>}
     <LedgerExceptions items={exceptions} canResolve={manage} />
-    {!wallet && protocol && <Callout tone="info" title="Choose how this workspace pays">Most teams use a workspace contract: your own wallet owns it, and the agent can only act inside your rules. You can instead keep funds in an Altana passkey wallet. A workspace keeps the first wallet you link.</Callout>}
-    {protocol && (!wallet || contract) && <Card><CardHeader title="Your workspace contract" description="Your budget, limits, approvals and payouts, enforced on Celo mainnet" icon={<Landmark />} />
+    {protocol && (!wallet || contract) && <Card><CardHeader title={contract ? "Your Payout account" : "Set up your Payout account"} description={contract ? "Your money, your limits, your approvals" : "Recommended: create it, add money, and you're done"} icon={<Landmark />} />
       <CardBody><WorkspaceContract view={protocol} canManage={manage} /></CardBody>
     </Card>}
-    {showServerWallet && <Card><CardHeader title="Workspace wallet" description={live ? "Celo wallet ready for approved payments" : "Attach a dedicated wallet to this workspace"} icon={<WalletIcon />} />
+    {showServerWallet && <Card><CardHeader title="Payout account" description={live ? "Ready for approved payments" : "Connect the payout account set up on this server"} icon={<WalletIcon />} />
       <CardBody className="space-y-4">
         {wallet?.address ? <>
-          <CopyField value={wallet.address} />
-          <ExternalLink href={addressExplorerUrl("Celo", wallet.address)}>View on Celoscan</ExternalLink>
           <KeyValue items={[
-            {k: "Network", v: CELO.name}, {k: "Status", v: wallet.frozen ? "Paused" : live ? "Ready to pay" : "Not ready to pay yet"},
-            {k: "USDC", v: <ExternalLink href={addressExplorerUrl("Celo", CELO.usdc)}>Token contract</ExternalLink>},
-            {k: "Payment receipts", v: <Link href="/app/receipts">Review receipts →</Link>},
+            {k: "Status", v: wallet.frozen ? "Paused" : live ? "Ready to pay" : "Not ready to pay yet"},
+            {k: "Payment receipts", v: <Link href="/app/receipts">See receipts →</Link>},
           ]} />
-          {manage && !wallet.frozen && <ActionButton action={toggleFreezeAction} label="Freeze spending" icon={<ShieldCheck />} />}
+          {manage && !wallet.frozen && <ActionButton action={toggleFreezeAction} label="Pause all payments" icon={<ShieldCheck />} />}
+          <details className="text-[12px] text-ink-3"><summary className="cursor-pointer">Proof / technical details</summary>
+            <div className="mt-2 space-y-2"><CopyField value={wallet.address} /><ExternalLink href={addressExplorerUrl("Celo", wallet.address)}>See it on Celoscan</ExternalLink> · <ExternalLink href={addressExplorerUrl("Celo", CELO.usdc)}>USDC token contract</ExternalLink><p>{CELO.name}, chain {CELO.chainId}.</p></div>
+          </details>
         </> : <>
-          <p className="text-sm text-ink-3">Attach the agent wallet configured on this server to this workspace.</p>
-          {manage && <ActionButton action={provisionWalletAction} label="Attach configured Celo wallet" icon={<WalletIcon />} />}
+          <p className="text-sm text-ink-3">Connect the payout account configured on this server to this workspace.</p>
+          {manage && <ActionButton action={provisionWalletAction} label="Connect configured payout account" icon={<WalletIcon />} />}
         </>}
       </CardBody>
     </Card>}
-    {(!wallet || wallet.provider === "altana") && <Card><CardHeader title={wallet ? "Your Altana wallet" : "Or use an Altana passkey wallet"} description="You keep custody. Celo enforces the agent's spend cap, allowed contracts and expiry." icon={<KeyRound />} />
-      <CardBody><AltanaWallet address={wallet?.address ?? null} canManage={manage} workspaceName={project.name} session={session ? {id: session.id, publicKey: session.publicKey, capUsd: fmtUsdc(session.capMicro), period: session.period, expiresAt: session.expiresAt.toISOString(), grantTxHash: session.grantTxHash, revokeTxHash: session.revokeTxHash} : null} /></CardBody>
+    {wallet?.provider === "altana" && <Card><CardHeader title="Your passkey wallet" description="You keep the money. GrowTendril's key can only spend up to your cap, until the date you chose." icon={<KeyRound />} />
+      <CardBody>{altanaCard}</CardBody>
     </Card>}
-    <Card><CardHeader title="Pay creators in their currency" description="Textile FX converts USD₮ to a local stablecoin, then the agent delivers it" icon={<Globe2 />} />
-      <CardBody className="space-y-3 text-sm text-ink-3">
-        <p>Choose naira, rupiah, reais or pesos on a creator’s profile. Every payment still needs your approval, and it counts as settled only after Celo shows the quoted amount reaching that creator.</p>
-        <p>Available: {PAYOUT_TOKEN_KEYS.join(", ")}.</p>
-      </CardBody>
-    </Card>
-    <Card><CardHeader title="Verified payments" description="Paid research with proof that a real person stands behind an agent" icon={<ShieldCheck />} />
-      <CardBody className="space-y-3 text-sm text-ink-3">
-        <p>GrowTendril’s research service requires Self Agent ID before it offers a paid request, and limits use per person across their agents. Payments use Celo’s x402 facilitator. Each purchase retains its source evidence and is reconciled against the USDC transfer.</p>
-        <p>Agent identity: {process.env.CELO_AGENT_ID ? <>ERC-8004 agent #{process.env.CELO_AGENT_ID} on Celo</> : "not registered yet"}. Self verification: {process.env.SELF_AGENT_ENABLED === "1" ? "active" : "not active yet"}.</p>
-        <p>Prepaid scan credit is separate from wallet funds. <Link className="underline" href="/billing">Manage Billing</Link></p>
-      </CardBody>
-    </Card>
-    {withdrawal && <Card><CardHeader title="Withdraw USDC" description="Owner only; confirmed with an emailed code and an onchain receipt" />
-      <CardBody><p className="mb-4 text-sm text-ink-3">Available: {fmtUsdc(withdrawal.availableMicro)} after committed payments. Network gas uses CELO separately.</p><WithdrawForm availableUsdc={String(withdrawal.availableMicro / 1e6)} explorer={CELO.explorer} /></CardBody>
+    {!wallet && (otherOption
+      ? <details className="rounded-[14px] border border-line bg-surface"><summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-[13px] font-medium text-ink"><KeyRound className="size-4 text-ink-3" /> Other option: passkey wallet</summary><div className="border-t border-line p-4">{altanaCard}<p className="mt-3 text-[12px] text-ink-3">A workspace keeps the first payout option you set up.</p></div></details>
+      : <Card><CardHeader title="Passkey wallet" description="You keep the money. GrowTendril's key can only spend up to your cap." icon={<KeyRound />} /><CardBody>{altanaCard}</CardBody></Card>)}
+    <UsdcHelp />
+    {withdrawal && <Card><CardHeader title="Take money out" description="Owner only. We email you a code to confirm it." />
+      <CardBody><p className="mb-4 text-sm text-ink-3">Available: {fmtUsdc(withdrawal.availableMicro)} after payments already approved. The network fee is paid separately in CELO.</p><WithdrawForm availableUsdc={String(withdrawal.availableMicro / 1e6)} explorer={CELO.explorer} /></CardBody>
     </Card>}
-    {owner && <p className="text-[11.5px] text-ink-4">Workspace ID <code className="num break-all">{project.id}</code></p>}
+    <details className="rounded-[14px] border border-line bg-surface text-sm">
+      <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-[13px] font-medium text-ink"><Globe2 className="size-4 text-ink-3" /> Technical details</summary>
+      <div className="space-y-4 border-t border-line p-4 text-ink-3">
+        <div><div className="font-medium text-ink">Paying creators in their own currency</div><p className="mt-1">Choose naira, rupiah, reais or pesos on a creator&apos;s profile. Textile FX converts USD₮ into a local digital currency and GrowTendril delivers it. Every payment still needs your OK, and it counts as paid only after Celo shows the quoted amount reaching the creator. Available: {PAYOUT_TOKEN_KEYS.join(", ")}.</p></div>
+        <div><div className="font-medium text-ink">Paid research</div><p className="mt-1">GrowTendril&apos;s research service only serves agents with a Self Agent ID, and limits apply per person. Payments use Celo&apos;s x402 facilitator, and each purchase keeps its sources and is matched to the USDC transfer. Agent identity: {process.env.CELO_AGENT_ID ? <>ERC-8004 agent #{process.env.CELO_AGENT_ID} on Celo</> : "not registered yet"}. Self verification: {process.env.SELF_AGENT_ENABLED === "1" ? "active" : "not active yet"}.</p></div>
+        <p>Credit for scans is separate from this account. <Link className="underline" href="/billing">Go to Billing</Link></p>
+        {owner && <p className="text-[11.5px] text-ink-4">Workspace ID <code className="num break-all">{project.id}</code></p>}
+      </div>
+    </details>
   </div>;
 }

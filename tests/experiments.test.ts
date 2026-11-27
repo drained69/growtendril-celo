@@ -51,11 +51,11 @@ beforeAll(async () => {
     budgetCategory: "content",
     target: "10 visits",
     action: "Commission one post",
-    budgetMicro: toMicro(30),
+    budgetMicro: toMicro(20),
     successEvent: "purchase",
     successTarget: 2,
     stopMaxCpaMicro: toMicro(72),
-    stopAfterSpendMicro: toMicro(15),
+    stopAfterSpendMicro: toMicro(10),
     timeframeDays: 10,
     status: "proposed",
     dataMode: "LIVE",
@@ -70,9 +70,10 @@ describe("paying for an experiment", () => {
     await expect(x.launchExperiment(db, { projectId: "p1", experimentId: EXP })).rejects.toThrow(/who gets paid/);
   });
 
-  it("splits a tranche above the per-payment ceiling into installments", async () => {
-    const first = await x.nextInstallment(db, { id: EXP, budgetMicro: toMicro(30), stopAfterSpendMicro: toMicro(15) }, "first", toMicro(10));
-    expect(first).toMatchObject({ amount: toMicro(10), installment: 1, dueMicro: toMicro(15) });
+  it("pays each half in one payment, and refuses a half above the largest single payment instead of splitting it", async () => {
+    const first = await x.nextInstallment(db, { id: EXP, budgetMicro: toMicro(20), stopAfterSpendMicro: toMicro(10) }, "first", toMicro(10));
+    expect(first).toMatchObject({ amount: toMicro(10), installment: 1, dueMicro: toMicro(10) });
+    await expect(x.nextInstallment(db, { id: EXP, budgetMicro: toMicro(30), stopAfterSpendMicro: toMicro(15) }, "first", toMicro(10))).rejects.toThrow(/largest single payment is 10(\.00)? USDC/);
   });
 
   it("is denied with a clear reason while no wallet can pay", async () => {
@@ -92,9 +93,8 @@ describe("paying for an experiment", () => {
     const [ap] = await pendingApprovals();
     expect(ap.requestedMicro).toBe(toMicro(10));
 
-    // While it waits, the rest of tranche 1 is what's left.
-    const next = await x.nextInstallment(db, { id: EXP, budgetMicro: toMicro(30), stopAfterSpendMicro: toMicro(15) }, "first", toMicro(10));
-    expect(next.amount).toBe(toMicro(5));
+    // While it waits, the first half is fully committed: no extra payment can be added to it.
+    await expect(x.nextInstallment(db, { id: EXP, budgetMicro: toMicro(20), stopAfterSpendMicro: toMicro(10) }, "first", toMicro(10))).rejects.toThrow(/first payment is already made/);
 
     await exec.resolveApproval(db, { approvalId: ap.id, userId: "u1", resolution: "approve" });
     const [tx] = await db.select().from(s.transactions).where(eq(s.transactions.id, ap.transactionId!));
@@ -111,7 +111,7 @@ describe("paying for an experiment", () => {
     expect(await status()).toBe("proposed");
   });
 
-  it("uses an explicitly configured higher ceiling across both tranches without exceeding remaining commitments", async () => {
+  it("pays a test in at most two payments: half at launch and the rest once the work is live", async () => {
     const projectId = "real-budget";
     const experimentId = "real-budget-experiment";
     await db.insert(s.projects).values({ id: projectId, ownerId: "u1", name: "Customer campaign", webhookSecret: "secret" });
@@ -120,8 +120,8 @@ describe("paying for an experiment", () => {
     await db.insert(s.wallets).values({ id: "real-budget-wallet", projectId, provider: "celo_eoa", address: "0x2222222222222222222222222222222222222222", circleWalletId: "real-cw", blockchain: "CELO", status: "ACTIVE", dataMode: "LIVE" });
     await db.insert(s.experiments).values({
       id: experimentId, projectId, missionId: realMissionId, number: 1, title: "Commission customer research", hypothesis: "A useful post reaches qualified buyers.",
-      channel: "content", budgetCategory: "content", target: "10 purchases", action: "Commission a post", budgetMicro: toMicro(200), successEvent: "purchase", successTarget: 10,
-      stopMaxCpaMicro: toMicro(20), stopAfterSpendMicro: toMicro(75), timeframeDays: 10, status: "proposed", dataMode: "LIVE",
+      channel: "content", budgetCategory: "content", target: "10 purchases", action: "Commission a post", budgetMicro: toMicro(100), successEvent: "purchase", successTarget: 10,
+      stopMaxCpaMicro: toMicro(20), stopAfterSpendMicro: toMicro(50), timeframeDays: 10, status: "proposed", dataMode: "LIVE",
       recipientAddress: "0x000000000000000000000000000000000000bEEF", recipientLabel: "Writer",
     });
 
@@ -142,14 +142,12 @@ describe("paying for an experiment", () => {
     } finally {
       provider.reachable = false;
     }
+    await expect(x.launchExperiment(db, { projectId, experimentId, tranche: "second" })).rejects.toThrow(/when the work is live/);
     await x.recordDelivery(db, { projectId, experimentId, userId: "u1", url: "https://example.test/delivered-post" });
-    await propose("first", 25);
-    await expect(x.launchExperiment(db, { projectId, experimentId })).rejects.toThrow(/first tranche is already paid or waiting/);
+    await expect(x.launchExperiment(db, { projectId, experimentId })).rejects.toThrow(/first payment is already made/);
 
     await propose("second", 50);
-    await propose("second", 50);
-    await propose("second", 25);
-    expect(await x.experimentCommitted(db, experimentId)).toMatchObject({ committedMicro: toMicro(200), attempts: 5 });
+    expect(await x.experimentCommitted(db, experimentId)).toMatchObject({ committedMicro: toMicro(100), attempts: 2 });
     await expect(x.launchExperiment(db, { projectId, experimentId, tranche: "second" })).rejects.toThrow(/whole budget is already paid or waiting/);
   });
 });

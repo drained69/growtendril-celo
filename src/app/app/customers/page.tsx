@@ -6,11 +6,13 @@ import { relTime } from "@/lib/time";
 import { Badge, Card, CardBody, CardHeader, Confidence, EmptyState, LinkButton, ModeBadge, PageHeader, Stat, StatStrip, StatusBadge } from "@/components/ui";
 import { DataTable } from "@/components/ui/data-table";
 import { customerConversations } from "@/server/queries/customer-conversations";
+import { ScanButton } from "@/components/features/agent/scan-button";
+import { can } from "@/server/auth/access";
 
 const score = (v: number, strong = 70) => <span className={`num ${v >= strong ? "text-ink" : v >= 45 ? "text-ink-2" : "text-ink-4"}`}>{v}</span>;
 
 export default async function Customers() {
-  const { project, db } = await requireProject();
+  const { project, db, role } = await requireProject();
   const [rows, people, [profile]] = await Promise.all([
     db.select().from(s.companies).where(eq(s.companies.projectId, project.id)).orderBy(desc(s.companies.overallScore)),
     customerConversations(db, project.id),
@@ -104,12 +106,10 @@ export default async function Customers() {
       ) : !consumer && people.length === 0 ? (
         <EmptyState
           icon={<Building2 />}
-          title="No companies with intent signals yet"
-          description="Companies appear here when a scan finds public evidence of buying intent — recommendation requests, migrations, hiring or funding tied to your category."
+          title="No companies looking to buy yet"
+          description="Companies appear here when a scan finds public signs they want to buy — asking for a recommendation, switching tools, hiring or raising money in your category."
           action={
-            <LinkButton href="/app/runs" variant="primary" icon={<Radar />}>
-              Run a scan
-            </LinkButton>
+<ScanButton canRun={can(role, "operate")} />
           }
         />
       ) : null}

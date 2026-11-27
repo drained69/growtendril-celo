@@ -14,7 +14,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ActionButton } from "@/components/features/agent/action-button";
 import { AgentLog } from "@/components/features/agent/agent-log";
 
-const KIND_LABEL: Record<string, string> = { cycle: "Agent cycle", settlements: "Settlement check", gateway_deposit: "Wallet deposit", cleanup: "Cleanup" };
+const KIND_LABEL: Record<string, string> = { cycle: "Scan for customers", settlements: "Payment check", gateway_deposit: "Money added", cleanup: "Cleanup" };
 const TRIGGER_LABEL: Record<string, string> = { system: "System", user: "Manual", schedule: "Autopilot", manual: "Manual", demo: "Demo" };
 
 function duration(a: Date | null, b: Date | null): string {
@@ -48,15 +48,15 @@ export default async function Runs() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Agent runs"
-        description="Background jobs and operator cycles: what ran, why it was triggered, how long it took, and every step the agents logged."
+        title="Scan history"
+        description="Every scan for customers and background check: what ran, why it started, how long it took, and each step it took."
         meta={
           <>
             <ModeBadge mode={project.dataMode} />
-            {project.lastCycleAt ? <span>Last cycle {relTime(project.lastCycleAt)}</span> : <span>No cycle has run yet</span>}
+            {project.lastCycleAt ? <span>Last scan {relTime(project.lastCycleAt)}</span> : <span>No scan yet</span>}
           </>
         }
-        actions={can(role, "operate") && <ActionButton action={runCycleAction} label={priced("Run agent", "scan")} variant="primary" icon={<Radar />} />}
+        actions={can(role, "operate") && <ActionButton action={runCycleAction} label={priced("Scan for customers", "scan")} variant="primary" icon={<Radar />} />}
       />
 
       <StatStrip className="grid-cols-2 lg:grid-cols-4">
@@ -189,7 +189,7 @@ export default async function Runs() {
           </ul>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 text-[12.5px] text-ink-3">
-            <span>No operator runs yet — run a cycle now, or turn on autopilot so the operator scans on a schedule.</span>
+            <span>No scans yet. Click “Scan for customers”, or turn on Autopilot to scan on a schedule.</span>
             <LinkButton href="/app/settings#autopilot" size="xs" icon={<Settings2 />}>
               Autopilot settings
             </LinkButton>

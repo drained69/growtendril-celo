@@ -37,14 +37,14 @@ export function RunAgentButton({ disabled, priceUsdc, creditLow, ownsCredit }: {
           setLog(r.data.log);
           if (r.data.status === "done" || r.data.status === "failed") {
             if (r.data.skipped) {
-              const message = r.data.skipped === "balance too low" ? "Prepaid scan credit is too low. Wallet USDC is separate; add credit in Billing." : r.data.skipped;
+              const message = r.data.skipped === "balance too low" ? "There isn't enough credit for a scan. Money in your Payout account is separate — add credit in Billing." : r.data.skipped;
               setError(message);
               setStatus("skipped");
               toast.error("Scan didn’t run", message, r.data.skipped === "balance too low" ? { label: ownsCredit ? "Add credit in Billing" : "Ask workspace owner", href: ownsCredit ? "/billing" : "/app/team" } : undefined);
-            } else if (r.data.status === "done") toast.success("Agent cycle complete", `${r.data.log.length} steps — see the log for decisions`);
+            } else if (r.data.status === "done") toast.success("Scan finished", `${r.data.log.length} steps — open the log to see what it found`);
             else {
-              setError(r.data.error ?? "The worker could not complete this cycle.");
-              toast.error("Agent cycle failed", r.data.error ?? undefined);
+              setError(r.data.error ?? "The scan stopped before it finished. Try again in a minute.");
+              toast.error("Scan didn't finish", r.data.error ?? "Try again in a minute.");
             }
             setJobId(null);
             router.refresh();
@@ -52,7 +52,7 @@ export function RunAgentButton({ disabled, priceUsdc, creditLow, ownsCredit }: {
           }
         }
       } catch {
-        if (!stopped) setError("Couldn’t read the worker's status. Checking will retry automatically.");
+        if (!stopped) setError("We lost track of the scan for a moment. We'll keep checking.");
       }
       if (!stopped) timer = setTimeout(poll, 3000);
     };
@@ -62,7 +62,7 @@ export function RunAgentButton({ disabled, priceUsdc, creditLow, ownsCredit }: {
 
   const running = !!jobId;
   if (creditLow && !running && !starting && !disabled) {
-    return <LinkButton href={ownsCredit ? "/billing" : "/app/team"} variant="primary" icon={<Coins />}>{ownsCredit ? "Add scan credit" : "Request scan credit"}</LinkButton>;
+    return <LinkButton href={ownsCredit ? "/billing" : "/app/team"} variant="primary" icon={<Coins />}>{ownsCredit ? "Add credit to scan" : "Ask the owner for credit"}</LinkButton>;
   }
   return (
     <div className="relative">
@@ -71,7 +71,7 @@ export function RunAgentButton({ disabled, priceUsdc, creditLow, ownsCredit }: {
         size="sm"
         disabled={disabled}
         loading={starting}
-        title={priceUsdc ? `Run a market scan now — ${priceUsdc} USDC from prepaid billing credit` : "Run a market scan now"}
+        title={priceUsdc ? `Scan for customers now — ${priceUsdc} USDC from your credit (the GrowTendril fee)` : "Scan for customers now"}
         icon={running ? <Loader2 className="animate-spin" /> : <Play />}
         onClick={async () => {
           if (running) return setOpen(true);
@@ -83,30 +83,30 @@ export function RunAgentButton({ disabled, priceUsdc, creditLow, ownsCredit }: {
             if (!r.ok) {
               if (r.code === "INSUFFICIENT_CREDIT") {
                 router.refresh();
-                return toast.error("Scan credit needed", r.error, { label: r.nextHref === "/app/team" ? "Ask workspace owner" : "Add credit in Billing", href: r.nextHref ?? "/billing" });
+                return toast.error("Not enough credit for a scan", r.error, { label: r.nextHref === "/app/team" ? "Ask workspace owner" : "Add credit in Billing", href: r.nextHref ?? "/billing" });
               }
-              return toast.error("Couldn’t start the agent", r.error);
+              return toast.error("Couldn’t start the scan", r.error);
             }
-            if (!r.data?.jobId) return toast.error("Couldn’t start the agent", "No job was returned. Try again.");
+            if (!r.data?.jobId) return toast.error("Couldn’t start the scan", "Try again in a moment.");
             setError(null);
             setLog([]);
             setStatus("queued");
             setJobId(r.data.jobId);
             setOpen(true);
           } catch {
-            toast.error("Couldn’t start the agent", "Check your connection and try again.");
+            toast.error("Couldn’t start the scan", "Check your connection and try again.");
           } finally {
             startingRef.current = false;
             setStarting(false);
           }
         }}
       >
-        {running ? (status === "queued" ? "Queued…" : "Running…") : "Run agent"}
+        {running ? (status === "queued" ? "Starting…" : "Scanning…") : "Scan for customers"}
       </Button>
-      <Dialog open={open} onClose={() => setOpen(false)} title={`Agent cycle${status ? ` · ${status}` : ""}`} description={running ? "You can close this view and reopen it with the running button." : "Review the outcome and each recorded step."} size="lg">
+      <Dialog open={open} onClose={() => setOpen(false)} title={`Scan for customers${status ? ` · ${status === "queued" ? "starting" : status === "running" ? "scanning" : status}` : ""}`} description={running ? "You can close this and reopen it with the scanning button." : "What the scan did, step by step."} size="lg">
         {error && <Callout tone="danger" className="mb-3">{error}</Callout>}
-        {log.length ? <AgentLog log={log} /> : <div role="status" className="rounded-[14px] border border-dashed border-line-strong bg-surface-2 px-3 py-5 text-center text-[12.5px] text-ink-3">{running ? "Waiting for the worker to report progress…" : "No steps were recorded for this cycle."}</div>}
-        <Link href="/app/runs" onClick={() => setOpen(false)} className="mt-3 inline-block text-[12px] text-s1 hover:underline">View all agent runs</Link>
+        {log.length ? <AgentLog log={log} /> : <div role="status" className="rounded-[14px] border border-dashed border-line-strong bg-surface-2 px-3 py-5 text-center text-[12.5px] text-ink-3">{running ? "Waiting for the scan to report progress…" : "This scan didn't record any steps."}</div>}
+        <Link href="/app/runs" onClick={() => setOpen(false)} className="mt-3 inline-block text-[12px] text-s1 hover:underline">See scan history</Link>
       </Dialog>
     </div>
   );

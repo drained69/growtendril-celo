@@ -48,7 +48,7 @@ export class InsufficientCredit extends Error {
     readonly service: ServiceKey,
     readonly balanceMicro: number,
   ) {
-    super(`${SERVICES[service].name} costs ${fmtUsdc(servicePriceMicro(service))} of prepaid credit; the workspace owner's credit balance is ${fmtUsdc(balanceMicro)}. The owner can pay a Billing invoice from the workspace wallet to fund the scan.`);
+    super(`${SERVICES[service].name} costs ${fmtUsdc(servicePriceMicro(service))} of credit, and the workspace owner has ${fmtUsdc(balanceMicro)}. The owner can add credit in Billing.`);
   }
 }
 

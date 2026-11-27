@@ -52,7 +52,7 @@ describe("real-budget spending settings", () => {
     expect((await updatePolicyAction(undefined, rules("250"))).ok).toBe(false);
     expect((await loadPolicy(db, browser.projectId)).customPaymentCeilingEnabled).toBe(false);
     browser.session = createSessionToken("actions-owner");
-    expect(await updatePolicyAction(undefined, rules("250"))).toMatchObject({ ok: true, message: "Policy saved (v2)" });
+    expect(await updatePolicyAction(undefined, rules("250"))).toMatchObject({ ok: true, message: "Limits saved (version 2)" });
     expect(await loadPolicy(db, browser.projectId)).toMatchObject({ customPaymentCeilingEnabled: true, hardCeilingMicro: 250_000_000, autonomyEnabled: false });
     const { schema: s } = await import("@/server/db/client");
     const { eq } = await import("drizzle-orm");

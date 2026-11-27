@@ -7,12 +7,14 @@ import { DAY_MS } from "@/lib/time";
 import { Badge, Card, CardHeader, EmptyState, LinkButton, ModeBadge, PageHeader, Velocity, type Tone } from "@/components/ui";
 import { DataTable } from "@/components/ui/data-table";
 import { Sparkline } from "@/components/charts";
+import { ScanButton } from "@/components/features/agent/scan-button";
+import { can } from "@/server/auth/access";
 
 const STATUS_TONE: Record<string, Tone> = { EMERGING: "accent", ACCELERATING: "good", PEAKING: "warn", DECLINING: "bad", CONTROVERSIAL: "warn", UNDEREXPLORED: "info", STABLE: "neutral" };
 const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
 export default async function Narratives() {
-  const { project, db } = await requireProject();
+  const { project, db, role } = await requireProject();
   const [rows, links] = await Promise.all([
     db.select().from(s.narratives).where(eq(s.narratives.projectId, project.id)).orderBy(desc(s.narratives.relevance), desc(s.narratives.volume7d)),
     db.select({ n: s.narrativePosts.narrativeId, at: s.socialPosts.publishedAt }).from(s.narrativePosts).innerJoin(s.socialPosts, eq(s.narrativePosts.postId, s.socialPosts.id)).where(eq(s.socialPosts.projectId, project.id)),
@@ -106,12 +108,10 @@ export default async function Narratives() {
       ) : (
         <EmptyState
           icon={<TrendingUp />}
-          title="No narratives yet"
-          description="Narratives form once enough relevant public posts cluster around a theme. Connect sources and run a scan to collect them."
+          title="No trends yet"
+          description="Trends appear once enough public posts talk about the same thing. Scan for customers to start collecting them."
           action={
-            <LinkButton href="/app/runs" variant="primary" icon={<Radar />}>
-              Run a scan
-            </LinkButton>
+<ScanButton canRun={can(role, "operate")} />
           }
         />
       )}

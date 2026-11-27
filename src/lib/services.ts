@@ -7,16 +7,16 @@ export type ServiceKey = "scan" | "creator_report" | "campaign_brief";
 
 export const SERVICES: Record<ServiceKey, { name: string; priceUsdc: number; unit: string; blurb: string }> = {
   scan: {
-    name: "Market scan",
+    name: "Scan for customers",
     priceUsdc: 1,
     unit: "per scan",
-    blurb: "One operator cycle: read your sources, score customers, narratives and creators, update the growth plan and propose experiments. Each autopilot run is one scan.",
+    blurb: "Reads the places your customers talk, scores the people, trends and creators it finds, updates your growth plan and suggests tests. Each Autopilot run is one scan.",
   },
   creator_report: {
-    name: "Influencer report",
+    name: "Creator report",
     priceUsdc: 1.5,
     unit: "per refresh",
-    blurb: "Scout new creators, read their profiles and rebuild the report with contact routes and first messages.",
+    blurb: "Finds new creators, reads their profiles and rebuilds the report with how to reach them and a first message.",
   },
   campaign_brief: {
     name: "Campaign brief",
@@ -29,11 +29,11 @@ export const SERVICES: Record<ServiceKey, { name: string; priceUsdc: number; uni
 export const SERVICE_KEYS = Object.keys(SERVICES) as ServiceKey[];
 export const servicePriceMicro = (k: ServiceKey) => Math.round(SERVICES[k].priceUsdc * 1_000_000);
 
-/** Autopilot runs one market scan per interval, so its cadence is also its daily cost. */
+/** Autopilot runs one scan per interval, so its cadence is also its daily cost. */
 export const AUTOPILOT_SCANS_PER_DAY: Record<string, number> = { off: 0, hourly: 24, every_6h: 4, daily: 1 };
 export function autopilotCostLabel(cadence: string): string {
   const scans = AUTOPILOT_SCANS_PER_DAY[cadence] ?? 0;
-  if (!scans) return "Only when you run it";
+  if (!scans) return "Only when you start a scan";
   const perDay = scans * SERVICES.scan.priceUsdc;
   return `≈ ${perDay} USDC/day · ${(perDay * 30).toLocaleString("en-US")} USDC/month`;
 }

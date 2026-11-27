@@ -6,6 +6,8 @@ import { schema as s } from "@/server/db/client";
 import { EmptyState, LinkButton, ModeBadge, PageHeader, cn } from "@/components/ui";
 import { LinkTabs } from "@/components/ui/tabs";
 import { OpportunityCards } from "@/components/features/growth/opportunity-cards";
+import { ScanButton } from "@/components/features/agent/scan-button";
+import { can } from "@/server/auth/access";
 
 const TYPES = ["ALL", "CUSTOMER", "KOL", "NARRATIVE", "PERSON", "PRODUCT_ISSUE", "COMPETITOR", "PARTNERSHIP", "CONTENT", "COMMUNITY", "EVENT"];
 const TYPE_LABEL: Record<string, string> = { ALL: "All", KOL: "Creator", PERSON: "Person asking", PRODUCT_ISSUE: "Product issue" };
@@ -18,7 +20,7 @@ const typeLabel = (t: string) => TYPE_LABEL[t] ?? t.charAt(0) + t.slice(1).toLow
 
 export default async function Opportunities({ searchParams }: { searchParams: Promise<{ type?: string; status?: string }> }) {
   const { type = "ALL", status = "active" } = await searchParams;
-  const { project, db } = await requireProject();
+  const { project, db, role } = await requireProject();
   const all = await db.select().from(s.opportunities).where(eq(s.opportunities.projectId, project.id)).orderBy(desc(s.opportunities.overallScore));
   const statusMatch = (o: (typeof all)[number]) => status === "all" || (status === "active" ? o.status !== "dismissed" : o.status === status);
   const inStatus = all.filter(statusMatch);
@@ -58,14 +60,12 @@ export default async function Opportunities({ searchParams }: { searchParams: Pr
         <EmptyState
           icon={<Lightbulb />}
           title={all.length ? "No opportunities match these filters" : "No opportunities yet"}
-          description={all.length ? "Switch type or status to see the rest." : "Opportunities are derived from customers, creators and narratives once a scan has collected evidence."}
+          description={all.length ? "Switch type or status to see the rest." : "Opportunities come from the customers, creators and trends a scan finds. Start one now."}
           action={
             all.length ? (
               <LinkButton href="/app/opportunities">Reset filters</LinkButton>
             ) : (
-              <LinkButton href="/app/runs" variant="primary" icon={<Radar />}>
-                Run a scan
-              </LinkButton>
+<ScanButton canRun={can(role, "operate")} />
             )
           }
         />

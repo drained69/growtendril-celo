@@ -52,7 +52,7 @@ export function ActionButton({
           start(async () => {
             try {
               const r = await action();
-              if (!r.ok) toast.error(r.code === "INSUFFICIENT_CREDIT" ? "Scan credit needed" : "Couldn’t complete that", r.error, r.code === "INSUFFICIENT_CREDIT" && r.nextHref ? { label: r.nextHref === "/billing" ? "Add credit in Billing" : "Ask workspace owner", href: r.nextHref } : undefined);
+              if (!r.ok) toast.error(r.code === "INSUFFICIENT_CREDIT" ? "Not enough credit for a scan" : "That didn’t work", r.error, r.code === "INSUFFICIENT_CREDIT" && r.nextHref ? { label: r.nextHref === "/billing" ? "Add credit in Billing" : "Ask workspace owner", href: r.nextHref } : undefined);
               else if (r.message) toast.success(r.message);
               if (r.ok && logTitle && r.log?.length) setLog(r.log);
               const createdId = r.data && typeof r.data === "object" && "id" in r.data && typeof r.data.id === "string" ? r.data.id : null;

@@ -105,7 +105,7 @@ export default async function Discover({ searchParams }: { searchParams: Promise
             <LinkButton href="/app/integrations" icon={<Plug />}>
               Sources
             </LinkButton>
-            {can(role, "operate") && <ActionButton action={runCycleAction} label={priced("Run scan", "scan")} variant="primary" icon={<Radar />} />}
+            {can(role, "operate") && <ActionButton action={runCycleAction} label={priced("Scan for customers", "scan")} variant="primary" icon={<Radar />} />}
           </>
         }
       />

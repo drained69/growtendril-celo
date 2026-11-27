@@ -11,6 +11,8 @@ import { Logo } from "@/components/layout/logo";
 import type { ShellProps } from "@/lib/shell-types";
 import { logoutAction, switchProjectAction } from "@/server/actions/auth";
 
+const ROLE_NAME: Record<string, string> = { owner: "Owner", admin: "Admin", member: "Member", viewer: "Viewer" };
+
 export type { ShellProps };
 
 function WorkspaceSwitcher({ workspace, workspaces, isGuest }: Pick<ShellProps, "workspace" | "workspaces"> & { isGuest: boolean }) {
@@ -33,7 +35,7 @@ function WorkspaceSwitcher({ workspace, workspaces, isGuest }: Pick<ShellProps, 
         <>
           <MenuLabel>Workspaces</MenuLabel>
           {workspaces.map((w) => (
-            <MenuItem key={w.id} icon={<Avatar name={w.name} size={16} square />} hint={w.id === workspace.id ? <Check className="size-3.5 text-accent" /> : w.role} onClick={() => (close(), switchProjectAction(w.id))}>
+            <MenuItem key={w.id} icon={<Avatar name={w.name} size={16} square />} hint={w.id === workspace.id ? <Check className="size-3.5 text-accent" /> : ROLE_NAME[w.role] ?? w.role} onClick={() => (close(), switchProjectAction(w.id))}>
               {w.name}
             </MenuItem>
           ))}
@@ -104,7 +106,7 @@ export function Sidebar(p: ShellProps & { onNavigate?: () => void }) {
           <Link
             href="/billing"
             onClick={p.onNavigate}
-            title={p.credit.isOwner ? "Your prepaid balance — services are paid from it" : "The workspace owner's balance"}
+            title={p.credit.isOwner ? "Your credit — scans and reports are paid from it" : "The workspace owner's credit"}
             className={cn("group flex items-center justify-between gap-2 rounded-[14px] px-3 py-2.5 ring-1 transition-[transform,box-shadow] hover:-translate-y-px", p.credit.low ? "glow-butter ring-warning/30" : "glow-mint ring-line")}
           >
             <span className="flex items-center gap-2 text-[11.5px] text-ink-3">
@@ -130,7 +132,7 @@ export function Sidebar(p: ShellProps & { onNavigate?: () => void }) {
               <Avatar name={p.user.name} size={22} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[12px] text-ink">{p.user.isGuest ? "Guest" : p.user.name}</span>
-                <span className="block truncate text-[11px] text-ink-4">{p.role}</span>
+                <span className="block truncate text-[11px] text-ink-4">{ROLE_NAME[p.role] ?? p.role}</span>
               </span>
             </button>
           )}

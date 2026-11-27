@@ -24,10 +24,10 @@ const GRANTS: Record<Role, Permission[]> = {
 
 export const ROLE_LABEL: Record<Role, string> = { owner: "Owner", admin: "Admin", member: "Member", viewer: "Viewer" };
 export const ROLE_HELP: Record<Role, string> = {
-  owner: "Everything, including deleting the workspace and transferring ownership.",
-  admin: "Approves spend, edits policy, manages the wallet, integrations and members.",
-  member: "Runs the agent and experiments within policy. Cannot approve spend.",
-  viewer: "Read-only access to intelligence, experiments and receipts.",
+  owner: "Everything, including deleting the workspace and handing it to someone else.",
+  admin: "Approves payments, sets the budget, manages the Payout account, integrations and team.",
+  member: "Runs scans and tests within the budget. Can't approve payments.",
+  viewer: "Can look at everything, but can't change anything.",
 };
 
 export function can(role: Role | string | null | undefined, p: Permission): boolean {

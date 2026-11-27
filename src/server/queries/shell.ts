@@ -15,8 +15,8 @@ export async function shellData(db: DB, user: CurrentUser, project: typeof s.pro
   const wallet = await getWallet(db, project.id);
   const live = walletIsLive(wallet);
   const walletState = wallet?.frozen ? "frozen" : live ? "live" : "none";
-  const kind = wallet?.provider === "growth_vault" ? "Workspace contract" : wallet?.provider === "altana" ? "Altana wallet" : "Workspace wallet";
-  const walletLabel = { frozen: "Spending frozen", live: `${kind} · ${wallet?.address?.slice(0, 6)}…${wallet?.address?.slice(-4)}`, simulation: "Simulation — no wallet", none: "Set up payments" }[walletState];
+  const kind = wallet?.provider === "altana" ? "Passkey wallet" : "Payout account";
+  const walletLabel = { frozen: "Payments paused", live: `${kind} ready`, simulation: "No Payout account yet", none: "Set up your Payout account" }[walletState];
 
   const notices: Notice[] = [];
   const approvals = await db.select().from(s.approvals).where(and(eq(s.approvals.projectId, project.id), eq(s.approvals.status, "pending"))).orderBy(desc(s.approvals.createdAt)).limit(5);

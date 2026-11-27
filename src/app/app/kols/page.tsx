@@ -5,6 +5,8 @@ import { schema as s } from "@/server/db/client";
 import type { ScoreComponent } from "@/server/domain/scoring/intent";
 import { Avatar, Card, EmptyState, LinkButton, ModeBadge, PageHeader, Stat, StatStrip, StatusBadge } from "@/components/ui";
 import { DataTable } from "@/components/ui/data-table";
+import { ScanButton } from "@/components/features/agent/scan-button";
+import { can } from "@/server/auth/access";
 
 const COLS: [string, string][] = [
   ["audienceFit", "Audience"],
@@ -24,7 +26,7 @@ function cell(v?: number) {
 }
 
 export default async function Creators() {
-  const { project, db } = await requireProject();
+  const { project, db, role } = await requireProject();
   const rows = await db.select().from(s.kols).where(eq(s.kols.projectId, project.id)).orderBy(desc(s.kols.overallScore));
   const strong = rows.filter((k) => k.overallScore >= 70).length;
   const engaged = rows.filter((k) => k.status !== "candidate" && k.status !== "dismissed").length;
@@ -96,11 +98,9 @@ export default async function Creators() {
         <EmptyState
           icon={<Users />}
           title="No relevant creators yet"
-          description="Creators are ranked from the authors of relevant public posts. Run a scan and the voices that keep coming up in your narratives appear here."
+          description="Creators come from the people who post about your space. Scan for customers and the ones who keep coming up appear here."
           action={
-            <LinkButton href="/app/runs" variant="primary" icon={<Radar />}>
-              Run a scan
-            </LinkButton>
+<ScanButton canRun={can(role, "operate")} />
           }
         />
       )}

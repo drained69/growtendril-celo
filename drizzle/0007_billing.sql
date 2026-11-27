@@ -5,7 +5,7 @@ CREATE TABLE "billing_invoices" (
 	"amount_micro" bigint NOT NULL,
 	"price_micro" bigint NOT NULL,
 	"pay_to" text NOT NULL,
-	"chain" text DEFAULT 'Arc' NOT NULL,
+	"chain" text DEFAULT 'Celo' NOT NULL,
 	"from_block" text NOT NULL,
 	"status" text DEFAULT 'pending' NOT NULL,
 	"tx_hash" text,

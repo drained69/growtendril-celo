@@ -532,7 +532,7 @@ CREATE TABLE "wallets" (
 	"provider" text NOT NULL,
 	"address" text,
 	"circle_wallet_id" text,
-	"blockchain" text DEFAULT 'ARC-TESTNET' NOT NULL,
+	"blockchain" text DEFAULT 'CELO-TESTNET' NOT NULL,
 	"status" text NOT NULL,
 	"frozen" boolean DEFAULT false NOT NULL,
 	"data_mode" "data_mode" NOT NULL,

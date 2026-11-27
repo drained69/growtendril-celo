@@ -64,9 +64,9 @@ function refused(error: unknown): Error {
     const revert = error.walk((e) => e instanceof ContractFunctionRevertedError);
     const reason = revert instanceof ContractFunctionRevertedError ? revert.reason : null;
     if (reason && REFUSAL_HELP[reason]) return new Error(REFUSAL_HELP[reason]);
-    if (reason && /^[a-z ]{3,48}$/i.test(reason)) return new Error(`The workspace contract refused this: ${reason}.`);
+    if (reason && /^[a-z ]{3,48}$/i.test(reason)) return new Error(`Your Payout account refused this: ${reason}.`);
   }
-  return new Error("The workspace contract could not be reached. Nothing was sent.");
+  return new Error("We couldn't reach your Payout account on Celo. Nothing was sent — try again in a minute.");
 }
 
 async function operatorSend(address: Address, abi: Abi, functionName: string, args: unknown[]): Promise<Hash> {
@@ -129,7 +129,7 @@ export async function ensureVaultIntent(db: DB, tx: Tx, amountMicro: number): Pr
   if (!tx.missionId || !tx.experimentId || !tx.recipient) throw new Error("This payment has no mission, experiment or recipient");
   const missionId = protocolId("mission", tx.missionId), experimentId = protocolId("experiment", tx.experimentId);
   const mission = await readWorkspace<readonly bigint[]>(workspace, "missions", [missionId]);
-  if (mission[3] === 0n) throw new Error("Publish this mission to your workspace contract on the Wallet page first.");
+  if (mission[3] === 0n) throw new Error("This month's budget isn't confirmed in your Payout account yet. Confirm it on the Payout account page, then try again.");
   const experiment = await readWorkspace<readonly unknown[]>(workspace, "experiments", [experimentId]);
   if (experiment[0] === `0x${"0".repeat(64)}`) {
     const [row] = await db.select().from(s.experiments).where(eq(s.experiments.id, tx.experimentId));
@@ -200,13 +200,13 @@ export async function openVaultIntents(db: DB, tx: Tx, amounts: readonly number[
 
 export async function executeVaultPayment(db: DB, tx: Tx): Promise<ChainTxResult> {
   const {workspace, intentId, state} = await ensureVaultIntent(db, tx, tx.amountMicro);
-  if (state !== INTENT_STATE.Approved) throw new Error("This payment still needs approval in the workspace contract.");
+  if (state !== INTENT_STATE.Approved) throw new Error("This payment still needs your OK, confirmed in your wallet.");
   const txHash = await operatorSend(workspace, workspaceAbi, "execute", [intentId]);
   return {state: "pending", txHash, explorerUrl: txExplorerUrl("Celo", txHash), steps: [{name: "Workspace contract payout", state: "pending", txHash}]};
 }
 export async function executeVaultCorridor(db: DB, tx: Tx, swapData: Hex): Promise<Hash> {
   const {workspace, intentId, state} = await ensureVaultIntent(db, tx, tx.amountMicro);
-  if (state !== INTENT_STATE.Approved) throw new Error("This payment still needs approval in the workspace contract.");
+  if (state !== INTENT_STATE.Approved) throw new Error("This payment still needs your OK, confirmed in your wallet.");
   return operatorSend(workspace, workspaceAbi, "executeCorridor", [intentId, swapData]);
 }
 export async function vaultMinPayout(db: DB, tx: Tx): Promise<bigint> {

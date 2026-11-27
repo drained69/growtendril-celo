@@ -5317,7 +5317,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'ARC-TESTNET'"
+          "default": "'CELO-TESTNET'"
         },
         "status": {
           "name": "status",

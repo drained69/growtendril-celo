@@ -16,7 +16,7 @@ export async function linkWorkspaceAction(address: string): Promise<ActionResult
     await limited("protocol-link");
     await linkWorkspace(db, { projectId: project.id, userId: user.id, address });
     revalidatePath("/app", "layout");
-    return { ok: true, message: "Workspace contract linked" };
+    return { ok: true, message: "Payout account connected" };
   } catch (e) {
     return fail(e);
   }
@@ -58,12 +58,12 @@ export async function prepareVaultApprovalAction(approvalId: string, amount?: st
     if (!approval?.transactionId) return { ok: false, error: "This approval is no longer open" };
     const [tx] = await db.select().from(s.transactions).where(and(eq(s.transactions.id, approval.transactionId), eq(s.transactions.projectId, project.id)));
     const wallet = await getWallet(db, project.id);
-    if (!tx || tx.kind !== "send" || wallet?.provider !== "growth_vault") return { ok: false, error: "This payment does not use a workspace contract" };
-    if (wallet.frozen) return { ok: false, error: "Spending is frozen" };
+    if (!tx || tx.kind !== "send" || wallet?.provider !== "growth_vault") return { ok: false, error: "This payment isn't paid from a Payout account. Refresh the page and try again." };
+    if (wallet.frozen) return { ok: false, error: "Payments are paused. Turn them back on from the Payout account page first." };
     const amountMicro = amount ? toMicro(amount) : approval.requestedMicro;
-    if (amountMicro <= 0 || amountMicro > approval.requestedMicro) return { ok: false, error: "The approved amount cannot exceed the request" };
+    if (amountMicro <= 0 || amountMicro > approval.requestedMicro) return { ok: false, error: "You can only pay the amount asked for, or less." };
     const intent = await ensureVaultIntent(db, tx, amountMicro);
-    if (intent.state !== INTENT_STATE.Pending && intent.state !== INTENT_STATE.Approved) return { ok: false, error: "This payment is closed in the workspace contract" };
+    if (intent.state !== INTENT_STATE.Pending && intent.state !== INTENT_STATE.Approved) return { ok: false, error: "This payment is already finished or cancelled in your Payout account." };
     const problem = await checkVaultIntentTerms(db, tx, amountMicro);
     if (problem) return { ok: false, error: problem };
     return { ok: true, data: { workspace: intent.workspace, intentId: intent.intentId, needsSignature: intent.state === INTENT_STATE.Pending } };

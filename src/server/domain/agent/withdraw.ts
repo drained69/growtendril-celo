@@ -59,7 +59,7 @@ export async function checkWithdrawal(db: DB, projectId: string, input: { amount
   const wallet = await getWallet(db, projectId);
   if (!wallet?.address || !walletIsLive(wallet)) throw new WithdrawError("This workspace has no Celo mainnet wallet that can sign.");
   if (wallet.provider === "altana") throw new WithdrawError("You hold this Altana wallet's keys. Withdraw from it directly with your passkey.");
-  if (wallet.provider === "growth_vault") throw new WithdrawError("Withdraw from your workspace contract with the owner wallet on this page.");
+  if (wallet.provider === "growth_vault") throw new WithdrawError("Take money out of your Payout account with your own wallet, using “Take out” on the Payout account page.");
   if (wallet.frozen) throw new WithdrawError("The wallet is frozen. Resume spending on this page before withdrawing.");
   const to = input.to.trim();
   if (!isAddress(to)) throw new WithdrawError("Enter a Celo (EVM) address: 0x followed by 40 hex characters.");

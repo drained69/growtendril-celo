@@ -75,8 +75,8 @@ export async function keyIsOnAccount(walletAddress: string, publicKey: string): 
 
 async function liveSession(db: DB, projectId: string) {
   const row = await openSession(db, projectId);
-  if (!row) throw new Error("No active Altana session key. Grant one from the Wallet page.");
-  if (row.expiresAt.getTime() <= Date.now()) throw new Error("The Altana session key has expired. Grant a new one from the Wallet page.");
+  if (!row) throw new Error("GrowTendril has no key for your passkey wallet. Give it one on the Payout account page.");
+  if (row.expiresAt.getTime() <= Date.now()) throw new Error("GrowTendril's key for your passkey wallet has expired. Give it a new one on the Payout account page.");
   const {sdk, altana} = await client();
   const {key} = decryptJson(row.sealedKey, `${AAD}:${projectId}`);
   const session = sdk.deserializeSession(row.session as never, sdk.signerFromPrivateKey(key as Hex));

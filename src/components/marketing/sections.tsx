@@ -6,6 +6,7 @@ import { Eyebrow, Headline, Lede, Section } from "@/components/marketing/primiti
 import { RotatingWord } from "@/components/marketing/rotating-word";
 import { MIN_TOPUP_USDC, SERVICE_KEYS, SERVICES } from "@/lib/services";
 import { cn } from "@/components/ui/cn";
+import { UsdcHelp } from "@/components/features/billing/usdc-help";
 
 const stagger = (i: number) => ({ "--i": i }) as React.CSSProperties;
 
@@ -21,7 +22,7 @@ export function Intro() {
             Somewhere right now, someone is asking a forum for exactly what you sell. Someone else is complaining about the competitor you beat. A creator your customers trust just posted about your category. You will never see any of it — there is too much, and it moves too fast.
           </p>
           <p>
-            GrowTendril reads it for you. It keeps the clues that matter, links each one to where it was said, and turns the best into a small experiment with a budget and a stop condition. <span className="font-semibold text-ink">You approve the spend.</span> It measures what happened, and the next move starts from there.
+            GrowTendril reads it for you. It keeps the clues that matter, links each one to where it was said, and turns the best into a small test with a budget. <span className="font-semibold text-ink">You say yes before anyone is paid.</span> It counts what happened, and the next move starts from there.
           </p>
         </div>
       </Reveal>
@@ -34,7 +35,7 @@ export function Intro() {
 const CHORES = [
   "read r/smallbusiness", "find people asking for a recommendation", "spot a competitor complaint", "notice a trend speeding up",
   "shortlist creators who post about your category", "flag suspicious creator engagement", "draft a first message", "write a campaign brief",
-  "make a tracked link", "count who clicked", "compare two experiments", "pause what isn't working",
+  "make a tracked link", "count who clicked", "compare two tests", "pause what isn't working",
   "write the morning brief", "pay a creator — after you approve", "keep the receipt", "score a lead's fit",
   "find a creator's public email", "watch a launch thread", "refresh the influencer report", "flag a stale campaign",
 ];
@@ -138,9 +139,9 @@ export function Trio() {
           <Reveal delay={200} className="group">
             <div className="glow-peach relative h-[270px] overflow-hidden rounded-[24px] p-6 pl-0 ring-1 ring-black/[0.04]">
               <MockCard className="-ml-6 mt-6 rounded-l-none pl-8">
-                <div className="font-mono text-[11px] text-ink-4">example payment · policy v3</div>
+                <div className="font-mono text-[11px] text-ink-4">example payment · your limits</div>
                 <div className="mt-3 flex items-center gap-2 rounded-[10px] bg-critical/[0.07] px-2.5 py-2 font-mono text-[12px] text-critical">
-                  <X className="size-3.5" /> <span className="line-through decoration-critical/60">pay 12 USDC</span> <span className="ml-auto text-[10.5px] text-critical/70">over 10 cap</span>
+                  <X className="size-3.5" /> <span className="line-through decoration-critical/60">pay 12 USDC</span> <span className="ml-auto text-[10.5px] text-critical/70">over your $10 limit</span>
                 </div>
                 <div className="mt-2 flex items-center gap-2 rounded-[10px] bg-mint/70 px-2.5 py-2 font-mono text-[12px] text-accent">
                   <Check className="size-3.5" /> ask you · 5 USDC <span className="ml-auto text-[10.5px] text-accent/70">waiting</span>
@@ -148,7 +149,7 @@ export function Trio() {
                 <div className="mt-3 text-[12px] text-ink-3">one rule held · nothing paid yet</div>
               </MockCard>
             </div>
-            <p className="mt-5 text-[15px] leading-relaxed text-ink/60"><span className="font-semibold text-ink">Asks before it spends.</span> Your limits are enforced in code. Anything over them is blocked; everything else waits for your yes.</p>
+            <p className="mt-5 text-[15px] leading-relaxed text-ink/60"><span className="font-semibold text-ink">Asks before it spends.</span> We ask before paying a person. Anything over your limits is blocked; everything else waits for your yes.</p>
           </Reveal>
         </div>
       </div>
@@ -159,12 +160,12 @@ export function Trio() {
 /* ───────────── Guardrails ───────────── */
 
 const POLICY = [
-  ["goal", "20 qualified customers in 14 days"],
-  ["budget", "100 USDC for this mission"],
-  ["ask first", "every payment, until you say otherwise"],
-  ["daily limit", "10 USDC before more approvals"],
-  ["hard ceiling", "10 USDC per payment (editable)"],
-  ["never", "pay without a named recipient and a reason"],
+  ["goal", "20 new customers a month"],
+  ["budget", "100 USDC a month (100 digital dollars)"],
+  ["ask first", "every payment to a person, always"],
+  ["largest", "10 USDC in any single payment"],
+  ["on its own", "nothing, until you allow research"],
+  ["never", "pay without a named person and a reason"],
 ];
 
 export function Guardrails() {
@@ -172,19 +173,19 @@ export function Guardrails() {
     <Section id="controls">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <Reveal>
-          <Eyebrow>Your rules</Eyebrow>
+          <Eyebrow>Your money</Eyebrow>
           <Headline>
-            Your limits aren&apos;t suggestions.
+            Your money stays yours.
             <br />
-            They&apos;re code.
+            We ask before paying anyone.
           </Headline>
-          <Lede>The spend policy is checked by a plain rules engine on every payment — not by a prompt. This illustrative cycle shows a blocked payment and a request for your approval.</Lede>
+          <Lede>Your money stays in an account only you control. You set one monthly budget and the largest single payment; GrowTendril checks every payment against them with fixed rules, not guesswork, and asks you before paying a person. Here is one example.</Lede>
         </Reveal>
         <div className="mt-12 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <Reveal className="window">
             <div className="flex items-center justify-between border-b border-line px-5 py-3.5 font-mono text-[12px] text-ink-4">
-              <span><span className="text-ink-2">spend-policy</span> · yourshop.com</span>
-              <span>example · v3</span>
+              <span><span className="text-ink-2">your limits</span> · yourshop.com</span>
+              <span>example</span>
             </div>
             <div className="py-2 font-mono text-[13px]">
               {POLICY.map(([k, v], i) => (
@@ -198,7 +199,7 @@ export function Guardrails() {
               <div className="stagger mt-1 grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2 bg-critical/[0.06] px-5 py-2.5 text-critical" style={stagger(6)}>
                 <Minus className="ml-auto size-3.5" />
                 <span className="truncate"><span className="line-through decoration-critical/50">pay @bigaccount 12 USDC</span></span>
-                <span className="text-[11px]">blocked · over 10 cap</span>
+                <span className="text-[11px]">blocked · over your $10 limit</span>
               </div>
               <div className="stagger grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2 bg-mint/60 px-5 py-2.5 text-accent" style={stagger(7)}>
                 <Plus className="ml-auto size-3.5" />
@@ -206,17 +207,17 @@ export function Guardrails() {
                 <span className="text-[11px]">waiting for your yes</span>
               </div>
             </div>
-            <div className="border-t border-line px-5 py-3.5 text-[12.5px] text-ink-3">Two requests, one cycle. One was stopped by a rule; the other is waiting for you.</div>
+            <div className="border-t border-line px-5 py-3.5 text-[12.5px] text-ink-3">Two payments, one scan. One was stopped by your limit; the other is waiting for your yes.</div>
           </Reveal>
           <div className="grid gap-5">
             <Reveal delay={120} className="rounded-[22px] bg-surface p-7 ring-1 ring-line shadow-[var(--shadow-card)]">
               <div className="display text-[64px] leading-none text-accent">0</div>
-              <div className="mt-3 text-[16px] font-semibold text-ink">payments allowed above your hard ceiling</div>
+              <div className="mt-3 text-[16px] font-semibold text-ink">payments bigger than your largest single payment</div>
               <p className="mt-1.5 text-[14px] leading-relaxed text-ink-3">Each one names who, how much and why. It is paid within the limits you set, or it is not paid at all.</p>
             </Reveal>
             <Reveal delay={200} className="rounded-[22px] bg-[#f5f5f4] p-7">
               <div className="flex items-center gap-2 text-[15px] font-semibold text-ink"><ShieldCheck className="size-4 text-accent" /> Nothing is guessed at</div>
-              <p className="mt-2 text-[14px] leading-relaxed text-ink-3">If the operator can&apos;t tell exactly who a payment is for, it stops and asks instead of paying the wrong person. You can freeze the wallet at any time.</p>
+              <p className="mt-2 text-[14px] leading-relaxed text-ink-3">If GrowTendril can&apos;t tell exactly who a payment is for, it stops and asks instead of paying the wrong person. You can pause every payment at any time.</p>
             </Reveal>
           </div>
         </div>
@@ -315,8 +316,8 @@ export function Receipts() {
     ["Paid to", "@thebrewguide"],
     ["Amount", "5.00 USDC"],
     ["Approved by", "you · 09:14"],
-    ["Policy", "v3 · within budget"],
-    ["Network", "Celo"],
+    ["Limits", "within this month's budget"],
+    ["Proof", "public record on Celo"],
   ];
   return (
     <Section id="receipts">
@@ -327,7 +328,7 @@ export function Receipts() {
             Every dollar leaves
             <br />a receipt.
           </Headline>
-          <Lede center>Who was paid, how much, why, who approved it and what happened next — kept with the experiment so you can judge it later.</Lede>
+          <Lede center>Who was paid, how much, why, who said yes and what happened next — kept with the test so you can judge it later.</Lede>
         </Reveal>
         <Reveal delay={100} className="mx-auto mt-12 flex max-w-[460px] items-center justify-between font-mono text-[13px]">
           <span className="text-center"><span className="block text-ink">you</span><span className="text-[11px] text-ink-4">approve once</span></span>
@@ -397,7 +398,7 @@ export function Pricing({ startHref, signedIn }: { startHref: string; signedIn: 
             <br />
             Nothing else.
           </Headline>
-          <Lede center>No subscription and no seats. Top up prepaid credit with USDC on Celo — from {MIN_TOPUP_USDC} USDC — and each service takes its fixed price when it runs. Payments to creators come from your own workspace contract. Credit never expires.</Lede>
+          <Lede center>No subscription and no seats. Add credit with USDC — a digital dollar, so 1 USDC is $1 — from ${MIN_TOPUP_USDC}, and each scan or report takes its fixed price. Credit never expires. Money for paying creators is separate and stays in your own Payout account.</Lede>
         </Reveal>
         <div className="mt-14 grid gap-5 md:grid-cols-3">
           {SERVICE_KEYS.map((k, i) => {
@@ -415,6 +416,11 @@ export function Pricing({ startHref, signedIn }: { startHref: string; signedIn: 
             );
           })}
         </div>
+        <Reveal delay={100} className="mt-5 rounded-[26px] bg-white p-8 text-[14px] leading-relaxed text-ink-2 ring-1 ring-line">
+          <div className="text-[14px] font-semibold text-ink">What a small business usually spends</div>
+          <p className="mt-2">One scan a day is about <span className="font-medium text-ink">${SERVICES.scan.priceUsdc * 30} of credit a month</span>. Your growth budget is your choice — for example $100 a month — and it only pays people when you say yes. Unspent budget stays yours.</p>
+          <UsdcHelp className="mt-4" compact />
+        </Reveal>
         <Reveal delay={120} className="mt-5 flex flex-col gap-6 rounded-[26px] bg-white p-8 ring-1 ring-line sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-[14px] font-semibold text-ink">Always free</div>
@@ -443,37 +449,37 @@ export function Terms() {
   const cards = [
     {
       title: "Asks first",
-      body: "Every payment asks by default. You can allow limited research purchases. Creator payouts always ask. Choose your per-payment ceiling in Settings; new workspaces start at 10 USDC.",
+      body: "We always ask before paying a person. You can let GrowTendril buy a little research on its own, up to an amount you choose each month.",
       mock: (
         <div className="flex items-center justify-between rounded-[10px] bg-surface-2 px-3 py-2 font-mono text-[12px]">
-          approval required <span className="flex h-5 w-9 items-center justify-end rounded-full bg-accent p-0.5"><span className="size-4 rounded-full bg-white" /></span>
+          ask me first <span className="flex h-5 w-9 items-center justify-end rounded-full bg-accent p-0.5"><span className="size-4 rounded-full bg-white" /></span>
         </div>
       ),
     },
     {
-      title: "USDC on Celo",
-      body: "Pay a one-time Celo invoice to add service credit. Creator payouts come from your workspace contract. Both are checked onchain.",
+      title: "Digital dollars",
+      body: "Everything is priced in USDC, a digital dollar worth $1. Credit pays for scans; your Payout account pays people. Every payment leaves a public receipt.",
       mock: (
         <div className="space-y-1.5 font-mono text-[12px]">
-          {[["network", "Celo"], ["asset", "USDC"]].map(([k, v]) => <div key={k} className="flex justify-between rounded-[10px] bg-surface-2 px-3 py-1.5"><span className="text-ink-4">{k}</span><span>{v}</span></div>)}
+          {[["money", "USDC ($1 each)"], ["network", "Celo"]].map(([k, v]) => <div key={k} className="flex justify-between rounded-[10px] bg-surface-2 px-3 py-1.5"><span className="text-ink-4">{k}</span><span>{v}</span></div>)}
         </div>
       ),
     },
     {
-      title: "Freeze any time",
-      body: "One switch freezes all spending from your workspace contract. Scans and reports can still use prepaid credit; no payment is sent for each scan.",
+      title: "Pause any time",
+      body: "One switch pauses every payment from your Payout account. Scans can still run on your credit.",
       mock: (
         <div className="flex items-center justify-between rounded-[10px] bg-surface-2 px-3 py-2 font-mono text-[12px]">
-          wallet <span className="flex items-center gap-1 rounded-full bg-s1/10 px-2 py-0.5 text-s1"><Snowflake className="size-3" /> frozen</span>
+          payments <span className="flex items-center gap-1 rounded-full bg-s1/10 px-2 py-0.5 text-s1"><Snowflake className="size-3" /> paused</span>
         </div>
       ),
     },
     {
       title: "No subscription",
-      body: "Pay per scan, report or brief. When the balance runs out, autopilot simply waits for you.",
+      body: "Pay per scan, report or brief. When your credit runs out, Autopilot simply waits for you.",
       mock: (
         <div className="rounded-[10px] bg-surface-2 px-3 py-2 font-mono text-[12px]">
-          <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-ink-4"><Coins className="size-3" /> balance</span><span>10.00 USDC</span></div>
+          <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-ink-4"><Coins className="size-3" /> credit</span><span>10.00 USDC</span></div>
           <div className="mt-1 text-[11px] text-ink-4">credit never expires</div>
         </div>
       ),
@@ -505,13 +511,15 @@ export function Terms() {
 /* ───────────── FAQ ───────────── */
 
 const FAQ = [
-  ["Does it spend money on its own?", "Every payment asks by default and names its recipient, amount, chain and reason. You can enable limited research and service purchases in Settings. Creator payments always need approval. You set the per-payment hard ceiling, which starts at 10 USDC for new workspaces. Mission budgets still apply, and taking the day's total above the daily limit asks for approval."],
+  ["What is USDC?", "USDC is a digital dollar: 1 USDC is always worth $1. You can get it in a phone wallet like MiniPay or Valora, or buy it on an exchange and withdraw it on the Celo network. GrowTendril uses it because it moves in seconds and costs less than a cent to send."],
+  ["Is my money safe?", "Your money stays in an account only you control — your Payout account. GrowTendril can suggest payments, but we ask you before paying any person, no payment can be bigger than your largest single payment, and you can pause everything or take your money out at any time."],
+  ["Does it spend money on its own?", "Not on people — every payment to a person waits for your yes, with who, how much and why. If you allow it, GrowTendril can buy a little research on its own, up to an amount you choose each month. Everything stays inside your monthly budget."],
   ["What kinds of products does it work for?", "Shops, apps, services, software and developer tools. It learns your customers and market from your site and a short profile, then listens in the places they talk."],
   ["Where does the evidence come from?", "Public sources you connect or that need no key. Every claim links back to the post, page or profile it came from so you can judge it yourself."],
-  ["How are payments made?", "Scans and reports use prepaid credit, which you add with a one-time USDC invoice on Celo. Payments to creators and services come from your own workspace contract: you fund it from your wallet, approve every payment to a person, and can freeze it or withdraw at any time."],
-  ["Can my team use it too?", "Yes. Invite teammates as viewers, members or admins. Approvals and settings respect those roles."],
-  ["What happens when my credit runs out?", "Nothing is lost. Paid scans and reports pause — autopilot included — until you add credit. Funds in your workspace contract never turn into scan credit; add credit with a Billing invoice."],
-  ["Is there a subscription?", "No. You top up USDC on Celo whenever you like and each service takes its fixed price when it runs. Credit never expires."],
+  ["How do payments work?", "There are two pots. Credit pays for scans and reports (the GrowTendril fee). Your Payout account holds the money that pays people, like creators: you add money from your wallet, say yes to every payment, and can pause it or take money out at any time."],
+  ["Can my team use it too?", "Yes. Invite teammates as a Viewer, Member or Admin. Only Owners and Admins can say yes to payments."],
+  ["What happens when my credit runs out?", "Nothing is lost. Scans and reports pause — Autopilot too — until you add credit. Money in your Payout account never turns into credit by itself."],
+  ["Is there a subscription?", "No. Add credit whenever you like, and each scan or report takes its fixed price. Credit never expires."],
 ];
 
 export function Faq() {
@@ -565,7 +573,7 @@ export function Finale({ startHref, signedIn }: { startHref: string; signedIn: b
               {signedIn ? "Open workspace" : "Start free"} <ArrowRight className="size-4" />
             </Link>
           </div>
-          <p className="mt-5 text-[13px] text-ink/55">No subscription. Top up from {MIN_TOPUP_USDC} USDC when you want to run a scan.</p>
+          <p className="mt-5 text-[13px] text-ink/55">No subscription. Add credit from ${MIN_TOPUP_USDC} when you want to scan.</p>
         </Reveal>
       </section>
     </div>
@@ -577,15 +585,15 @@ export function Finale({ startHref, signedIn }: { startHref: string; signedIn: b
 export function Footer({ startHref, signedIn }: { startHref: string; signedIn: boolean }) {
   const cols: [string, [string, string][]][] = [
     ["Product", [["What it does", "#product"], ["How a cycle works", "#how"], ["Creators", "#creators"], ["Pricing", "#pricing"]]],
-    ["Trust", [["Your rules", "#controls"], ["Receipts", "#receipts"], ["On your terms", "#terms"], ["Open growth toolkit", "https://github.com/drained69/growtendril-celo/tree/main/packages/growth-tools"], ["Questions", "#faq"]]],
-    ["Account", signedIn ? [["Open workspace", "/app"]] : [["Sign in", "/login"], ["Create account", "/signup"], ["Start a mission", startHref]]],
+    ["Trust", [["Your money", "#controls"], ["Receipts", "#receipts"], ["On your terms", "#terms"], ["Questions", "#faq"], ["Technical details", "#celo"], ["Open growth toolkit", "https://github.com/drained69/growtendril-celo/tree/main/packages/growth-tools"]]],
+    ["Account", signedIn ? [["Open workspace", "/app"]] : [["Sign in", "/login"], ["Create account", "/signup"], ["Start free", startHref]]],
   ];
   return (
     <footer className="mx-auto max-w-[1180px] px-5 pb-12 pt-16 sm:px-8">
       <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <Logo grow />
-          <p className="mt-4 max-w-[260px] text-[14px] leading-relaxed text-ink-3">Your growth operator. Evidence in, bounded action out, and a receipt for every move.</p>
+          <p className="mt-4 max-w-[260px] text-[14px] leading-relaxed text-ink-3">Finds your next customers, asks before it spends, and keeps a receipt for every dollar.</p>
         </div>
         {cols.map(([title, links]) => (
           <div key={title}>

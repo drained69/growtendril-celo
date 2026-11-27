@@ -71,7 +71,7 @@ export async function generateBriefAction(kolId: string, experimentId?: string):
     if (!k) return { ok: false, error: "Creator not found" };
     if (experimentId) {
       const [x] = await db.select({ id: s.experiments.id }).from(s.experiments).where(and(eq(s.experiments.id, experimentId), eq(s.experiments.projectId, project.id)));
-      if (!x) return { ok: false, error: "Experiment not found" };
+      if (!x) return { ok: false, error: "We couldn't find that test. Open it again from Tests." };
     }
     const ref = `brief:${newId()}`;
     await chargeService(db, { ownerId: project.ownerId, projectId: project.id, service: "campaign_brief", ref, actorId: user.id, note: `@${k.handle}` });

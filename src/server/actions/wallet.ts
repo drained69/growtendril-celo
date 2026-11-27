@@ -45,7 +45,7 @@ export async function toggleFreezeAction(): Promise<ActionResult> {
   try {
     const { project, db, user } = await guard("manage_wallet");
     const w = await getWallet(db, project.id);
-    if (!w) return { ok: false, error: "No wallet yet" };
+    if (!w) return { ok: false, error: "Set up your Payout account first." };
     await db.update(s.wallets).set({ frozen: !w.frozen }).where(eq(s.wallets.id, w.id));
     await audit(db, { projectId: project.id, actorType: "user", actorId: user.id, action: w.frozen ? "wallet.unfreeze" : "wallet.freeze" });
     revalidatePath("/app", "layout");

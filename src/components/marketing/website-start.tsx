@@ -35,7 +35,7 @@ export function WebsiteStart({ signedIn }: { signedIn: boolean }) {
             Find my next move <ArrowRight className="size-4" />
           </button>
         </div>
-        <p id="start-website-hint" className="px-4 pb-2 pt-3 text-[12px] leading-relaxed text-ink/60">Workspace setup is free. Market scans cost {SERVICES.scan.priceUsdc} USDC each. You review creator payments.</p>
+        <p id="start-website-hint" className="px-4 pb-2 pt-3 text-[12px] leading-relaxed text-ink/60">Setup is free. Each scan for customers costs ${SERVICES.scan.priceUsdc} of credit. We ask you before paying anyone.</p>
         {error && <p id="start-website-error" role="alert" className="px-4 pb-2 text-[12px] text-critical">{error}</p>}
       </form>
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-ink/65">

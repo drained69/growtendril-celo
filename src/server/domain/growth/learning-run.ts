@@ -20,7 +20,7 @@ export async function runLearning(db: DB, p: { projectId: string; missionId: str
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`financial:${p.projectId}`}))`);
     const [mission] = await tx.select({ id: s.missions.id }).from(s.missions).where(and(eq(s.missions.id, p.missionId), eq(s.missions.projectId, p.projectId), eq(s.missions.status, "active")));
-    if (!mission) throw new Error("No active mission in this workspace");
+    if (!mission) throw new Error("Set a goal first — there's nothing to compare yet.");
     return runLearningLocked(tx as unknown as DB, p);
   });
 }
@@ -100,7 +100,7 @@ export async function applyReallocation(db: DB, projectId: string, missionId: st
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`financial:${projectId}`}))`);
     const [mission] = await tx.select().from(s.missions).where(and(eq(s.missions.id, missionId), eq(s.missions.projectId, projectId), eq(s.missions.status, "active")));
-    if (!mission) throw new Error("No active mission in this workspace");
+    if (!mission) throw new Error("Set a goal first — there's nothing to compare yet.");
     const [applied] = await tx.select({ id: s.learnings.id }).from(s.learnings).where(and(eq(s.learnings.decisionId, decisionId), eq(s.learnings.projectId, projectId)));
     if (applied) return;
     const exps = await tx.select().from(s.experiments).where(and(eq(s.experiments.missionId, missionId), eq(s.experiments.projectId, projectId)));

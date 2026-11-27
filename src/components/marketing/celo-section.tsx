@@ -6,7 +6,7 @@ const RAILS = [
   {
     icon: Landmark,
     title: "A contract you own",
-    body: "Your budget and spending rules live in your own workspace contract. The agent can propose payments, but only your wallet approves a payment to a person, and you can freeze or withdraw at any time.",
+    body: "Your Payout account is your own workspace contract on Celo. Your limits are built into it. GrowTendril's agent can propose payments, but only your wallet approves a payment to a person, and you can pause it or take money out at any time.",
     detail: "Owner-controlled · enforced onchain",
   },
   {
@@ -34,13 +34,13 @@ export function OnCelo() {
     <Section id="celo">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <Reveal>
-          <Eyebrow>On Celo</Eyebrow>
+          <Eyebrow>Technical details</Eyebrow>
           <Headline>
-            Growth budgets that reach
+            For the curious:
             <br />
-            people where they live.
+            how it works underneath.
           </Headline>
-          <Lede>Creators should get paid in money they can spend, and your agent should never hold your money. GrowTendril keeps your budget in a contract you own on Celo mainnet, and checks each payment against the chain.</Lede>
+          <Lede>You don&apos;t need any of this to use GrowTendril. Payments run on Celo, a payments network where digital dollars move in seconds for less than a cent. Your Payout account is a contract on Celo that only your wallet controls, and every payment is checked against the public record.</Lede>
         </Reveal>
         <div className="mt-12 grid gap-5 md:grid-cols-2">
           {RAILS.map(({ icon: Icon, title, body, detail }, i) => (

@@ -15,16 +15,16 @@ export const dynamic = "force-dynamic";
 const NAV = [
   ["What it does", "#product"],
   ["How it works", "#how"],
-  ["Your rules", "#controls"],
-  ["On Celo", "#celo"],
+  ["Your money", "#controls"],
   ["Pricing", "#pricing"],
+  ["Questions", "#faq"],
 ];
 
 export default async function Landing() {
   const [metrics, user] = await Promise.all([getDb().then((db) => tractionMetrics(db)), currentUser()]);
   const signedIn = !!user && !user.isGuest;
   const startHref = signedIn ? "/app" : "/signup";
-  const startLabel = signedIn ? "Open workspace" : "Start a mission";
+  const startLabel = signedIn ? "Open workspace" : "Start free";
   return (
     <div className="marketing min-h-screen bg-surface text-ink">
       <div className="px-3 pt-3 sm:px-4 sm:pt-4">
@@ -49,7 +49,7 @@ export default async function Landing() {
               Know <span className="scribble">what to try</span> next.
             </h1>
             <p className="mx-auto mt-6 max-w-[600px] text-[clamp(1.05rem,1.6vw,1.25rem)] leading-[1.55] text-ink/65" style={{ animation: "rise-in 700ms 160ms cubic-bezier(0.2,0.75,0.2,1) both" }}>
-              Start with your website. GrowTendril finds relevant conversations and creators, recommends small growth tests, and connects recorded results to what you spent.
+              Paste your website. GrowTendril finds people asking for what you sell and creators your customers trust, suggests small tests, and shows what each dollar brought back. Your money stays in an account only you control, and we ask before paying anyone.
             </p>
             <WebsiteStart signedIn={signedIn} />
             <div className="mt-16 pb-14 sm:mt-20 sm:pb-20" style={{ animation: "rise-in 900ms 360ms cubic-bezier(0.2,0.75,0.2,1) both" }}>
@@ -64,7 +64,6 @@ export default async function Landing() {
         <Chores />
         <Trio />
         <Guardrails />
-        <OnCelo />
         <Shortlist />
         <Receipts />
         {metrics.projects >= 3 && (
@@ -73,8 +72,8 @@ export default async function Landing() {
               [
                 ["Workspaces growing", metrics.projects],
                 ["Qualified customers found", metrics.qualified],
-                ["Operator decisions", metrics.decisions],
-                ["USDC spent, with approval", metrics.spentMicro > 0 ? fmtUsdc(metrics.spentMicro, { unit: false }) : 0],
+                ["Decisions made", metrics.decisions],
+                ["Dollars paid, each with the owner's OK", metrics.spentMicro > 0 ? fmtUsdc(metrics.spentMicro, { unit: false }) : 0],
               ] as [string, string | number][]
             ).filter(([, v]) => v !== 0)}
           />
@@ -82,6 +81,7 @@ export default async function Landing() {
         <Pricing startHref={startHref} signedIn={signedIn} />
         <Terms />
         <Faq />
+        <OnCelo />
         <Finale startHref={startHref} signedIn={signedIn} />
       </main>
       <Footer startHref={startHref} signedIn={signedIn} />

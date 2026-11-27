@@ -48,10 +48,10 @@ async function createExperimentLocked(db: DB, p: Parameters<typeof createExperim
   const log = p.log ?? (() => {});
   const [opp] = await db.select().from(s.opportunities).where(and(eq(s.opportunities.id, p.opportunityId), eq(s.opportunities.projectId, p.projectId)));
   if (!opp) throw new Error("opportunity not found");
-  if (opp.type === "PRODUCT_ISSUE") throw new Error("Product issues are routed to the product team, not turned into paid experiments");
+  if (opp.type === "PRODUCT_ISSUE") throw new Error("This is a problem with your product, not something to pay for. Share it with whoever builds the product.");
   const [mission] = await db.select().from(s.missions).where(and(eq(s.missions.projectId, p.projectId), eq(s.missions.status, "active")));
-  if (!mission) throw new Error("No active mission");
-  if (p.budgetMicro !== undefined && (!Number.isSafeInteger(p.budgetMicro) || p.budgetMicro < toMicro(5))) throw new Error("Experiment budget must be at least 5 USDC in whole micro-USDC units");
+  if (!mission) throw new Error("Set a goal and monthly budget first, then make a test.");
+  if (p.budgetMicro !== undefined && (!Number.isSafeInteger(p.budgetMicro) || p.budgetMicro < toMicro(5))) throw new Error("A test needs a budget of at least 5 USDC.");
   const existing = await db.select().from(s.experiments).where(and(eq(s.experiments.opportunityId, opp.id), inArray(s.experiments.status, ["proposed", "awaiting_approval", "running"])));
   if (existing.length) return existing[0];
   const [project] = await db.select().from(s.projects).where(eq(s.projects.id, p.projectId));
@@ -228,7 +228,7 @@ export async function reviseExperimentProposal(db: DB, p: { projectId: string; e
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`financial:${p.projectId}`}))`);
     const work = tx as unknown as DB;
     const [exp] = await work.select().from(s.experiments).where(and(eq(s.experiments.id, p.experimentId), eq(s.experiments.projectId, p.projectId)));
-    if (!exp) throw new Error("Experiment not found");
+    if (!exp) throw new Error("We couldn't find that test. Open it again from Tests.");
     if (exp.channel === "creator_program") throw new Error("Edit creator campaign terms from Campaigns");
     if (exp.status !== "proposed") throw new Error("Only a test that hasn't started can be edited");
     const { attempts } = await experimentCommitted(work, exp.id);

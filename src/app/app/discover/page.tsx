@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { and, desc, eq, gte } from "drizzle-orm";
-import { ArrowRight, ArrowUpRight, Plug, Radar, Tags } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Plug, Radar, Tags, FlaskConical } from "lucide-react";
 import { requireProject } from "@/server/auth/current";
 import { priced } from "@/server/domain/billing";
 import { can } from "@/server/auth/access";
@@ -13,6 +13,7 @@ import { relTime, DAY_MS } from "@/lib/time";
 import { Badge, Callout, Card, CardBody, CardHeader, EmptyState, LinkButton, ModeBadge, PageHeader, StatusDot } from "@/components/ui";
 import { LinkTabs } from "@/components/ui/tabs";
 import { ActionButton } from "@/components/features/agent/action-button";
+import { ScanButton } from "@/components/features/agent/scan-button";
 import { sourceAppliesTo, sourceAudienceLabel } from "@/lib/source-readiness";
 
 const FILTERS = [
@@ -87,7 +88,7 @@ export default async function Discover({ searchParams }: { searchParams: Promise
     <div className="space-y-4">
       <PageHeader
         title="Discover"
-        description="Research feed from legitimately accessible public sources. Every item links to its source; signals are classified by auditable rules."
+        description="What people are saying in public places your customers use. Every post links to where it was said. When something looks worth acting on, turn it into a small test."
         meta={
           <>
             <ModeBadge mode={project.dataMode} />
@@ -96,14 +97,17 @@ export default async function Discover({ searchParams }: { searchParams: Promise
             </span>
             <span className="text-ink-4">·</span>
             <span>
-              <span className="num text-ink-2">{usable.length}</span> of {connections.length} sources ready for your audience
+              <span className="num text-ink-2">{usable.length}</span> of {connections.length} places ready to read
             </span>
           </>
         }
         actions={
           <>
             <LinkButton href="/app/integrations" icon={<Plug />}>
-              Sources
+              Where to look
+            </LinkButton>
+            <LinkButton href="/app/experiments/start" icon={<FlaskConical />}>
+              Try something with this
             </LinkButton>
             {can(role, "operate") && <ActionButton action={runCycleAction} label={priced("Scan for customers", "scan")} variant="primary" icon={<Radar />} />}
           </>
@@ -112,8 +116,8 @@ export default async function Discover({ searchParams }: { searchParams: Promise
 
       <Card>
         <CardHeader
-          title="Source status"
-          description={missing.length ? `${missing.length} relevant source${missing.length === 1 ? "" : "s"} need setup before they can contribute` : "Every available source for your audience is ready"}
+          title="Where GrowTendril looks"
+          description={missing.length ? `${missing.length} useful place${missing.length === 1 ? "" : "s"} need setting up before GrowTendril can read ${missing.length === 1 ? "it" : "them"}` : "Every useful place for your customers is ready"}
           icon={<Plug />}
           action={
             <Link href="/app/integrations" className="inline-flex items-center gap-1 text-[12px] text-ink-3 hover:text-ink">
@@ -191,9 +195,16 @@ export default async function Discover({ searchParams }: { searchParams: Promise
                           {mention.sentiment} · {mention.categories.slice(0, 2).join(", ").replace(/_/g, " ") || "mention"}
                         </Badge>
                       )}
-                      <a href={p.url} target={external ? "_blank" : undefined} rel="noreferrer" className="ml-auto inline-flex items-center gap-0.5 text-[11.5px] text-s1 hover:underline">
-                        Source {external && <ArrowUpRight className="size-3" />}
-                      </a>
+                      <span className="ml-auto flex items-center gap-3">
+                        {signals.some((x) => x.type !== "mention") && (
+                          <Link href="/app/experiments/start" className="inline-flex items-center gap-0.5 text-[11.5px] font-medium text-ink-2 hover:text-ink">
+                            Try something with this <ArrowRight className="size-3" />
+                          </Link>
+                        )}
+                        <a href={p.url} target={external ? "_blank" : undefined} rel="noreferrer" className="inline-flex items-center gap-0.5 text-[11.5px] text-s1 hover:underline">
+                          Where it was said {external && <ArrowUpRight className="size-3" />}
+                        </a>
+                      </span>
                     </div>
                   </li>
                 );
@@ -203,22 +214,29 @@ export default async function Discover({ searchParams }: { searchParams: Promise
           ) : (
             <EmptyState
               icon={<Radar />}
-              title={posts.length ? "Nothing matches this filter" : "No market data collected yet"}
+              title={posts.length ? "Nothing matches this filter" : "Nothing collected yet"}
               description={
                 posts.length
-                  ? "Try another filter, or widen the search terms in the product profile."
+                  ? "Try another filter, or add more search words to your product in Settings."
                   : usable.length
-                    ? "Run a scan to collect public posts from the ready sources."
-                    : "Connect at least one market source, then run a scan."
+                    ? "Scan for customers to collect public posts from the places that are ready."
+                    : "Choose at least one place to look, then scan for customers."
               }
-              action={posts.length ? <LinkButton href="/app/discover">Show all</LinkButton> : <LinkButton href="/app/integrations" variant="primary">Connect sources</LinkButton>}
+              action={posts.length ? <LinkButton href="/app/discover">Show all</LinkButton> : usable.length ? <ScanButton canRun={can(role, "operate")} /> : <LinkButton href="/app/integrations" variant="primary">Choose where to look</LinkButton>}
             />
           )}
         </div>
 
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Search terms" icon={<Tags />} />
+            <CardHeader title="Try something with this" icon={<FlaskConical />} />
+            <CardBody className="space-y-3 text-[12.5px] text-ink-3">
+              <p>Seen someone asking for what you sell, or a creator your customers follow? Turn the best of it into a small test with a budget, and we&apos;ll ask before paying anyone.</p>
+              <LinkButton href="/app/experiments/start" variant="primary" size="sm" icon={<ArrowRight />}>Start a test</LinkButton>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Search words" icon={<Tags />} />
             <CardBody>
               {profile?.keywords.length ? (
                 <div className="flex flex-wrap gap-1">
@@ -227,11 +245,11 @@ export default async function Discover({ searchParams }: { searchParams: Promise
                   ))}
                 </div>
               ) : (
-                <p className="text-[12.5px] text-ink-3">No keywords yet. Add them to the product profile so scans know what to look for.</p>
+                <p className="text-[12.5px] text-ink-3">No search words yet. Add some to your product in Settings so scans know what to look for.</p>
               )}
               {competitors.length > 0 && (
                 <>
-                  <div className="label mb-1.5 mt-4">Competitors tracked</div>
+                  <div className="label mb-1.5 mt-4">Competitors we watch</div>
                   <div className="flex flex-wrap gap-1">
                     {competitors.map((c) => (
                       <Badge key={c} tone="warn">
@@ -242,7 +260,7 @@ export default async function Discover({ searchParams }: { searchParams: Promise
                 </>
               )}
               <Link href="/app/settings" className="mt-4 inline-flex items-center gap-1 text-[12px] text-ink-3 hover:text-ink">
-                Edit product profile <ArrowRight className="size-3" />
+                Change search words <ArrowRight className="size-3" />
               </Link>
             </CardBody>
           </Card>

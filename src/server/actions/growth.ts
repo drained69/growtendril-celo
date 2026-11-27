@@ -93,7 +93,7 @@ export async function setExperimentRecipientAction(experimentId: string, _: unkn
     const { project, db, user } = await guard("manage_wallet");
     const f = Recipient.parse({ address: form.get("address"), label: form.get("label") || undefined });
     const [x] = await db.select().from(s.experiments).where(and(eq(s.experiments.id, experimentId), eq(s.experiments.projectId, project.id)));
-    if (!x) return { ok: false, error: "Experiment not found" };
+    if (!x) return { ok: false, error: "We couldn't find that test. Open it again from Tests." };
     if (x.channel === "creator_program") return { ok: false, error: "Manage this campaign and its rewards from Creator campaigns" };
     if (["succeeded", "failed", "stopped"].includes(x.status)) return { ok: false, error: `This experiment is ${x.status}` };
     await db.update(s.experiments).set({ recipientAddress: f.address, recipientLabel: f.label ?? null, updatedAt: new Date() }).where(eq(s.experiments.id, x.id));
@@ -111,7 +111,7 @@ export async function startExperimentAction(experimentId: string): Promise<Actio
   try {
     const { project, db, user } = await guard("operate");
     const [x] = await db.select().from(s.experiments).where(and(eq(s.experiments.id, experimentId), eq(s.experiments.projectId, project.id)));
-    if (!x) return { ok: false, error: "Experiment not found" };
+    if (!x) return { ok: false, error: "We couldn't find that test. Open it again from Tests." };
     if (x.channel === "creator_program") return { ok: false, error: "Manage this campaign and its rewards from Creator campaigns" };
     if (x.status !== "proposed") return { ok: false, error: `Only a proposed experiment can be started (this one is ${x.status.replace(/_/g, " ")})` };
     const now = new Date();
@@ -129,7 +129,7 @@ export async function stopExperimentAction(experimentId: string): Promise<Action
   try {
     const { project, db, user } = await guard("operate");
     const [x] = await db.select().from(s.experiments).where(and(eq(s.experiments.id, experimentId), eq(s.experiments.projectId, project.id)));
-    if (!x) return { ok: false, error: "Experiment not found" };
+    if (!x) return { ok: false, error: "We couldn't find that test. Open it again from Tests." };
     if (x.channel === "creator_program") return { ok: false, error: "Manage this campaign and its rewards from Creator campaigns" };
     if (!["proposed", "awaiting_approval", "running"].includes(x.status)) return { ok: false, error: `This experiment is already ${x.status}` };
     const txIds = (await db.select({ id: s.transactions.id }).from(s.transactions).where(eq(s.transactions.experimentId, x.id))).map((t) => t.id);
@@ -160,7 +160,7 @@ export async function runLearningAction(): Promise<ActionResult> {
   try {
     const { project, db } = await guard("operate");
     const [m] = await db.select().from(s.missions).where(and(eq(s.missions.projectId, project.id), eq(s.missions.status, "active")));
-    if (!m) return { ok: false, error: "No active mission" };
+    if (!m) return { ok: false, error: "Set a goal first — there's nothing to compare yet." };
     const { log, push } = collector();
     await runLearning(db, { projectId: project.id, missionId: m.id, log: push });
     revalidatePath("/app", "layout");
@@ -186,7 +186,7 @@ export async function recordManualConversionAction(experimentId: string, _: unkn
     const { project, db, user } = await guard("operate");
     const [camp] = await db.select().from(s.campaigns).where(eq(s.campaigns.experimentId, experimentId));
     const [x] = await db.select({ id: s.experiments.id }).from(s.experiments).where(and(eq(s.experiments.id, experimentId), eq(s.experiments.projectId, project.id)));
-    if (!x || !camp) return { ok: false, error: "Experiment not found" };
+    if (!x || !camp) return { ok: false, error: "We couldn't find that test. Open it again from Tests." };
     const opt = (k: string) => String(form.get(k) ?? "").trim() || undefined;
     const f = ManualConversion.parse({ event: form.get("event"), count: form.get("count") || 1, value: opt("value"), note: opt("note") });
     const total = f.value ? toMicro(f.value) : 0;

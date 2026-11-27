@@ -89,7 +89,7 @@ describe("next growth decision", () => {
     expect(nextGrowthStep({ ...ready, permissions: { ...ready.permissions, operate: false, approve: false } })).toMatchObject({ kind: "link", href: "/app/plan" });
   });
   it("brings a pending money decision ahead of new research", () => {
-    expect(nextGrowthStep({ ...ready, pendingApprovals: 1, scanStatus: "running" })).toMatchObject({ kind: "link", href: "/app/approvals", label: "Review requests" });
-    expect(nextGrowthStep({ ...ready, pendingApprovals: 1, permissions: { ...ready.permissions, approve: false } })).toMatchObject({ label: "View requests" });
+    expect(nextGrowthStep({ ...ready, pendingApprovals: 1, scanStatus: "running" })).toMatchObject({ kind: "link", href: "/app/approvals", label: "Review payments" });
+    expect(nextGrowthStep({ ...ready, pendingApprovals: 1, permissions: { ...ready.permissions, approve: false } })).toMatchObject({ label: "See payments" });
   });
 });

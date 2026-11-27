@@ -147,7 +147,7 @@ export function HeroWindow() {
                 <p className="mt-1 text-[14px] text-ink">
                   Pay <span className="font-semibold">@thebrewguide</span> <span className="num font-medium">5 USDC</span> toward a review campaign?
                 </p>
-                <p className="mt-0.5 text-[12px] text-ink-3">Fictional creator and campaign. You choose the payment ceiling; new workspaces start at 10 USDC.</p>
+                <p className="mt-0.5 text-[12px] text-ink-3">Fictional creator. 5 USDC is 5 digital dollars. You set the largest single payment.</p>
               </div>
               {approved == null ? (
                 <div className="flex shrink-0 gap-2">

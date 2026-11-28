@@ -10,6 +10,7 @@ GrowTendril finds customers and creators, proposes small growth experiments, pay
 | `GrowthWorkspace` | Holds a customer's USDC and USD₮, roles, spend policy, missions, experiments, payment intents, payouts and kill switch. |
 | `GrowthLedger` | Hash-chained Merkle checkpoints of receipts, evidence and learnings, plus cumulative experiment outcomes. |
 | `OutcomeRewardsEscrow` | Prefunded creator campaign rewards with a review window, refund hold and arbiter. |
+| `CampaignEscrow` | Prefunded open reward campaigns. The owner may name an agent that approves rewards within the fixed terms; each reward waits a 72-hour hold during which the owner can object. Deployed at `0xfbb1299540df7781a58563555c6429392de4859f`. |
 
 The deployment is immutable. There is no proxy admin, upgrade path, pause key or protocol fee.
 
@@ -31,6 +32,9 @@ External dependencies on Celo mainnet (chain 42220):
 | Payee or creator | Untrusted | Receive payments, dispute their escrow reward | Change amounts or redirect others' funds |
 | Campaign owner (escrow) | Trusted only for their campaign | Fund, queue rewards, reduce pending outcome bonuses while the recipient still has a day to dispute, dispute, reclaim unused funds | Take reserved rewards back without the arbiter, or cut a reward after a dispute |
 | Arbiter (escrow) | Semi-trusted, chosen by campaign owner | Release or reject a disputed reward | Redirect funds. Silence for 14 days resolves for the recipient |
+| Open campaign owner (CampaignEscrow) | Trusted only for their campaign | Fund, approve rewards, object to a waiting reward before its hold ends, replace or remove the agent, reclaim unused money after the review window | Take back a reward once its hold has passed, change the terms, or touch another campaign |
+| Open campaign agent (GrowTendril's operator) | **Untrusted for funds.** Assume its key can be stolen | Approve rewards at the fixed amount for campaigns that currently name it, relay payouts | Approve the owner, itself or anyone the owner objected to; exceed the spots or the terms; skip the hold; approve after being removed |
+| Open campaign participant | Untrusted | Sign the terms, receive one reward per campaign, relay their own payout | Receive twice in a campaign, or change the amount or recipient |
 | Anyone | Untrusted | Relay escrow claims, cancel expired intents | Everything else |
 
 ## Key invariants
@@ -44,6 +48,8 @@ External dependencies on Celo mainnet (chain 42220):
 7. Ledger outcome totals only rise, and a checkpoint cannot fork the hash chain.
 8. In escrow, `available + reserved` always equals the token balance attributable to a campaign, and each reward is paid at most once.
 9. A payment must still satisfy the current policy when it executes, so tightening limits also applies to intents already proposed.
+10. In CampaignEscrow, the token balance equals the sum of every campaign's `available + reserved`; each campaign's `reserved` equals its waiting rewards, its count equals waiting plus paid rewards, and its count never exceeds its spots.
+11. In CampaignEscrow, only the owner or the currently named agent approves a reward, never above the terms and never to an objected recipient; a recipient holds at most one waiting or paid reward per campaign; an objected reward is never paid; objection happens only before the hold ends and payout only after.
 
 ## Operational implications
 
@@ -51,6 +57,8 @@ External dependencies on Celo mainnet (chain 42220):
 - Spend accounting is committed at proposal and released on rejection or expiry, so budgets reflect open commitments rather than only settled spend.
 - Daily spend is counted at execution, using UTC days.
 - An operator compromise is bounded by each workspace's policy, and the owner stops it with the kill switch or by removing its role.
+- In open campaigns, a stolen operator key reaches at most the unspent money of live campaigns that still name it, and only through rewards that wait 72 hours. The owner recovers all of it by objecting to those rewards and calling `setAgent` with the zero address. The key never reaches a workspace contract or the owner's wallet.
+- Open campaign terms people sign are plain text; their keccak-256 hash is stored in the campaign, so the terms can't change after funding.
 - x402 research is paid by the Self-verified agent key rather than the workspace, because Self identity and the x402 payer must match.
 
 ## Known limits
@@ -61,4 +69,7 @@ External dependencies on Celo mainnet (chain 42220):
 - A stolen operator key can clutter a workspace with junk proposals or experiments, and race the owner's ledger checkpoints. It cannot move funds. The owner clears proposals with one rejection, stops experiments, and removes the agent.
 - Funds held by an expired payment stay reserved until anyone cancels it or the owner rejects it.
 - A conversion's minimum payout is fixed when it is proposed. The app refuses to let the owner approve one that is below 85% of Textile's live rate, but approving directly on the contract skips that check.
+- An open campaign's owner must notice an unwanted reward within its 72-hour hold to object. The app lists every reward with a countdown, but doesn't yet send an alert when a reward the app didn't expect appears onchain.
+- An open campaign's money can be reclaimed only 7 days after its deadline, even if the owner stops it early, so the last approved claims can finish.
+- The app caps open campaigns at 50 USDC per person and 500 USDC per campaign while the contract is unaudited. The contract itself doesn't enforce those caps.
 - The contracts have had an internal review, invariant fuzzing and a partial automated audit, but no independent human audit.

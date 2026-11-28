@@ -13,14 +13,16 @@ GrowTendril finds customers and creators for a small business. It proposes small
 
 Each business gets its own workspace contract on Celo mainnet. The contract holds the business's USDC and USD₮, its spending limits, its missions and experiments, and its kill switch. The agent can propose payments and carry out approved ones. It can't pay a person without the owner's approval, go over a limit or withdraw funds, even if its key is stolen.
 
+A business can also run an **open reward campaign**: it sets a fixed reward aside in the CampaignEscrow contract, anyone with the link joins and does the task, GrowTendril checks each claim, and every approved reward waits 3 days so the owner can object before it's paid.
+
 ### Quick tour for reviewers
 
 **Who holds the keys**
 
 | Key | Can | Can't |
 |---|---|---|
-| Business owner's wallet | Own its workspace contract: approve payments to people, change limits, freeze, remove the agent, withdraw | Touch another business's workspace |
-| Agent key (server) | Propose payments inside the rules, carry out approved ones, write results to the ledger | Approve its own payments, pay a person without approval, exceed a limit, withdraw |
+| Business owner's wallet | Own its workspace contract: approve payments to people, change limits, freeze, remove the agent, withdraw. Fund open campaigns, object to any reward during its 3-day hold, remove the agent from a campaign, take back unused money | Touch another business's workspace or campaign |
+| Agent key (server) | Propose payments inside the rules, carry out approved ones, write results to the ledger. In open campaigns that name it: approve rewards at the fixed amount and relay payouts | Approve its own payments, pay a person without approval, exceed a limit, withdraw. Skip a campaign's 3-day hold, approve someone the owner objected to, or touch a workspace contract or the owner's wallet |
 | Deployer | Nothing after deployment. There is no admin, owner, upgrade or pause key | — |
 
 **Where to look**
@@ -36,6 +38,8 @@ Each business gets its own workspace contract on Celo mainnet. The contract hold
 | Attribution tag on every agent transaction | [`attributionSuffix`](src/server/integrations/celo/client.ts#L8) |
 | ERC-8004 registration | [`celo-register.ts`](scripts/celo-register.ts#L24) |
 | Owner wallet actions in the app | [`workspace-contract.tsx`](src/components/features/wallet/workspace-contract.tsx#L58) |
+| Open campaigns: agent approval, 3-day objection, owner exit | [`queueReward`](contracts/src/CampaignEscrow.sol#L106) · [`object`](contracts/src/CampaignEscrow.sol#L124) · [`setAgent`](contracts/src/CampaignEscrow.sol#L96) · [`refundUnused`](contracts/src/CampaignEscrow.sol#L147) |
+| Open campaigns: checks before money moves | [`checkCampaignContract`](src/components/features/campaigns/open-chain.tsx#L19) (browser) · [`confirmOpenFunding`](src/server/domain/growth/open-campaigns.ts#L165) · [`decideClaim`](src/server/domain/growth/open-claim-check.ts#L31) · [`openEscrowTick`](src/server/jobs/open-campaigns.ts#L38) |
 
 **How to check it**
 
@@ -89,7 +93,8 @@ The agent is treated as an untrusted operator. Its key could be stolen, its mode
 |---|---|
 | **Demand discovery** | Searches public sources (X, Bluesky, Reddit, YouTube, RSS, Hacker News and GitHub) for buying intent, then scores prospective customers and creators. |
 | **Growth plans** | Turns a goal and a budget into missions and small experiments, each with a clear success event. |
-| **Creator campaigns** | Prefunded creator rewards held in an escrow contract, with a review window, a refund hold and a dispute path. |
+| **Open reward campaigns** | A fixed reward for anyone with the link who does a task, such as posting with their personal code. The money is set aside in CampaignEscrow first; GrowTendril checks each claim, and the owner can object to any reward for 3 days before it's paid. |
+| **Invite-only creator campaigns** | Prefunded creator rewards held in an escrow contract, with a review window, a refund hold and a dispute path. |
 | **Owner approvals** | Payments to people wait in **Approvals**. The owner checks the amount and recipient, then signs with their own wallet. |
 | **Stablecoin payouts** | Pays in USDC or USD₮ on Celo, or in the recipient's local currency (cNGN, IDRX, wARS, wBRL, wMXN or wCOP) through Textile FX. |
 | **Paid research** | The agent buys company and market research per request over x402, paid in Celo USDC. |
@@ -185,7 +190,7 @@ The contracts are immutable. There is no admin key, upgrade path, pause key or p
 
 ### Deployed contracts (Celo mainnet, chain ID 42220)
 
-Deployed on November 25, 2026 at 21:04 UTC. All four contracts are source-verified on [Sourcify](https://sourcify.dev), and each deployment transaction carries the Celo attribution tag.
+The first four were deployed on November 25, 2026 at 21:04 UTC, and CampaignEscrow on November 27, 2026 at 17:53 UTC. All five are source-verified on [Sourcify](https://sourcify.dev), and each deployment transaction carries the Celo attribution tag.
 
 | Contract | Address | Deployment |
 |---|---|---|
@@ -193,6 +198,7 @@ Deployed on November 25, 2026 at 21:04 UTC. All four contracts are source-verifi
 | **GrowthWorkspace** (template behind every workspace) | [`0x5F7E160E292E9Dd0077D9dc6B84Bbcc404F5fb1C`](https://celoscan.io/address/0x5F7E160E292E9Dd0077D9dc6B84Bbcc404F5fb1C) | Created by the factory's constructor in the same transaction |
 | **GrowthLedger** | [`0x41289019c57389874ee81600c605bdfea671ee5e`](https://celoscan.io/address/0x41289019c57389874ee81600c605bdfea671ee5e) | [Transaction](https://celoscan.io/tx/0xe149664a6d0042972ab4e9d28c2afa0cd1827abc866d1b87842e9bb1bdfec806), block 83,739,895 |
 | **OutcomeRewardsEscrow** | [`0x3157ed9d980dd30f419419145c1fcb481789fe15`](https://celoscan.io/address/0x3157ed9d980dd30f419419145c1fcb481789fe15) | [Transaction](https://celoscan.io/tx/0x0ce72401a474a6a8abea18126ff8211796237e72be7e40b523711f3d11f59465), block 83,739,885 |
+| **CampaignEscrow** | [`0xfbb1299540df7781a58563555c6429392de4859f`](https://celoscan.io/address/0xfbb1299540df7781a58563555c6429392de4859f) | [Transaction](https://celoscan.io/tx/0x92e7407bf25be1b6941185582dfbc4108160701785b855bbfab62e74c1a9c058), block 83,901,263 |
 
 The full record, with the deployer, compiler settings and a fingerprint of the deployed source, is in [`contracts/deployments/celo-mainnet.json`](contracts/deployments/celo-mainnet.json).
 
@@ -203,6 +209,7 @@ The full record, with the deployer, compiler settings and a fingerprint of the d
 | GrowthFactory | USDC, USD₮, the Textile FX reactor, and the six payout tokens listed under [External contracts](#external-contracts) |
 | GrowthLedger | GrowthFactory `0x22d5…f3b1` |
 | OutcomeRewardsEscrow | USDC and a refund hold of `259200` seconds (72 hours) |
+| CampaignEscrow | USDC and a hold of `259200` seconds (72 hours) |
 
 ### Contract overview
 
@@ -212,6 +219,7 @@ The full record, with the deployer, compiler settings and a fingerprint of the d
 | [`GrowthWorkspace`](contracts/src/protocol/GrowthWorkspace.sol) | One business's treasury and rules: team roles, spending policy, missions, experiments, payees, payment intents, payouts and the kill switch. |
 | [`GrowthLedger`](contracts/src/protocol/GrowthLedger.sol) | A public, hash-chained record of what the agent saw, decided, measured and learned, plus cumulative experiment outcomes. |
 | [`OutcomeRewardsEscrow`](contracts/src/OutcomeRewardsEscrow.sol) | Prefunded creator rewards with immutable terms, a review window, a refund hold, a single dispute and an arbiter timeout. |
+| [`CampaignEscrow`](contracts/src/CampaignEscrow.sol) | Prefunded open campaigns. The owner may name an agent that approves rewards within the fixed terms; every reward waits a 72-hour hold during which the owner can object. |
 
 ### GrowthFactory
 
@@ -327,6 +335,34 @@ A business prefunds a creator campaign in USDC. Its terms can't be changed after
 
 Events: `CampaignFunded`, `RewardQueued`, `OutcomesReduced`, `RewardDisputed`, `DisputeResolved`, `RewardPaid` and `UnusedRefunded`.
 
+### CampaignEscrow
+
+Holds the money for open reward campaigns. The business sets the whole amount aside before anyone joins, and fixes the terms: the reward formula, the number of spots, the deadline and a hash of the plain-language terms people sign. It may name an agent (GrowTendril's operator) that approves rewards within those terms. Nothing can change the terms afterwards, and there is no admin, upgrade or pause path.
+
+**Reward formula:** the same as OutcomeRewardsEscrow, `base + qualityBonus × quality / 100 + outcomeBonus × outcomes`. GrowTendril's open campaigns currently use the base reward only, so every approved person gets the same fixed amount.
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `refundHold` | 72 hours | Time between approving a reward and paying it, during which the owner can object |
+| `REVIEW_WINDOW` | 7 days | Rewards can be approved until this long after the deadline; unused money is returned after it |
+| `MAX_CAMPAIGN_LENGTH` | 365 days | Furthest a deadline can be set |
+
+| Function | Who can call | What it does |
+|---|---|---|
+| `createCampaign` | Funder | Creates and funds a campaign and names its agent (or none). The ID is derived from the funder's address. |
+| `setAgent` | Campaign owner | Replaces or removes the agent at any time. Removing it stops automatic approval immediately. |
+| `queueReward` | Owner or current agent | Approves one reward per recipient, up to the number of spots, until 7 days after the deadline. The agent can't approve the owner, itself, or anyone the owner objected to. |
+| `object` | Campaign owner | Cancels a waiting reward before its hold ends. The money goes back into the campaign and the spot is freed. |
+| `claim` | Anyone | Pays the bound recipient once the hold has passed |
+| `refundUnused` | Campaign owner | Returns money no reward is using, after the review window |
+| `campaignKey`, `hasReward`, `objectedTo` | View | Campaign ID from a funder and salt; whether a recipient holds a reward; whether the owner objected to them |
+
+Events: `CampaignFunded`, `AgentChanged`, `RewardQueued`, `RewardObjected`, `RewardPaid` and `UnusedRefunded`.
+
+**What a stolen agent key can do.** It can only approve rewards in live campaigns that still name it, at the fixed amount, one per address, up to the free spots. Each of those rewards waits 72 hours, and the owner can object to every one and remove the agent with `setAgent`, which returns all of that money to the campaign. The key can never touch a workspace contract, the owner's wallet or another campaign.
+
+**Who signs each transaction.** The business signs the USDC approval, `createCampaign`, `object`, `setAgent` and `refundUnused` from its own wallet. GrowTendril's agent signs `queueReward` for approved claims and relays `claim` after the hold. A participant can also send `claim` for their own reward from their wallet. Every one of these carries the attribution tag at the end of its calldata. Agreeing to the terms is a free wallet signature, not a transaction.
+
 ### Guarantees enforced onchain
 
 - Funds reserved for open payments can't be withdrawn until those payments are rejected, cancelled or executed.
@@ -338,6 +374,8 @@ Events: `CampaignFunded`, `RewardQueued`, `OutcomesReduced`, `RewardDisputed`, `
 - The agent's key can't withdraw, change rules or roles, or approve its own proposals.
 - Ledger outcome totals only rise, and checkpoints can't fork, skip or rewrite the hash chain.
 - Each escrow reward is paid at most once, for its recorded amount, and only to its bound recipient.
+- In an open campaign, only the owner or the agent it currently names can approve a reward, never above the campaign's terms or its spots, and never to someone the owner objected to.
+- An objected reward is never paid, an objection is only possible during the hold, and a payout is only possible after it.
 
 ### External contracts
 
@@ -391,7 +429,8 @@ The full trust model, invariants and known limits are in [the protocol notes](do
 | **Local-currency payout** | Agent proposes a USD₮ payment with a minimum payout → owner approves → app gets a firm Textile FX quote → contract converts and delivers atomically → app confirms delivery |
 | **Paid research (buyer)** | Agent fetches the 402 quote → policy check → signs the exact USDC amount → seller settles on Celo → app records the settlement transaction |
 | **Paid research (seller)** | Caller signs with Self → identity check → x402 payment → research response; failed responses aren't charged |
-| **Creator rewards** | Business funds a campaign in escrow → creators deliver → business queues rewards → 72-hour hold, with a dispute path → anyone relays the claim to the creator |
+| **Open reward campaign** | Business sets the money aside in CampaignEscrow → person joins and signs the terms with their payout wallet → does the task and sends the link → GrowTendril checks it and its agent approves the reward → 72-hour hold, during which the owner can object → the agent (or the person) sends the payout |
+| **Creator rewards (invite-only)** | Business funds a campaign in escrow → creators deliver → business queues rewards → 72-hour hold, with a dispute path → anyone relays the claim to the creator |
 | **Service credit** | The customer sends USDC to the billing address → the app matches the `Transfer` log to an invoice → credit is added. Native CELO never pays an invoice. |
 
 If a payment's result can't be confirmed (for example, a seller or relay stops responding after a signed authorization has been sent), the funds stay committed and the payment is flagged for review. It is never sent twice automatically.
@@ -469,7 +508,7 @@ If a payment's result can't be confirmed (for example, a seller or relay stops r
 ```
 contracts/                  Solidity contracts, Foundry tests and deployment records
   src/protocol/             GrowthFactory, GrowthWorkspace, GrowthLedger
-  src/                      OutcomeRewardsEscrow
+  src/                      OutcomeRewardsEscrow, CampaignEscrow
   test/                     Unit tests, invariant tests and a forked-USDC test
   deployments/              Deployment records, including celo-mainnet.json
 src/
@@ -548,7 +587,7 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 |---|---|---|
 | **Core** | `DATABASE_URL`, `APP_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY` | Required in production. `SESSION_SECRET` needs at least 32 characters; `ENCRYPTION_KEY` must be 32 bytes. `openssl rand -hex 32` produces a value that works for either. |
 | **Agent wallet** | `CELO_AGENT_PRIVATE_KEY`, `CELO_AGENT_PROJECT_ID`, `CELO_ATTRIBUTION_CODE`, `CELO_AGENT_ID`, `CELO_MAINNET_RPC` | A dedicated key bound to one workspace. The app won't sign without the attribution tag. |
-| **Contracts** | `CELO_GROWTH_FACTORY`, `CELO_GROWTH_LEDGER`, `CELO_REWARDS_ESCROW` | Addresses printed by `npm run celo:deploy`. |
+| **Contracts** | `CELO_GROWTH_FACTORY`, `CELO_GROWTH_LEDGER`, `CELO_REWARDS_ESCROW`, `CELO_CAMPAIGN_ESCROW` | Addresses printed by `npm run celo:deploy`. Open reward campaigns can't be funded until `CELO_CAMPAIGN_ESCROW` is set. |
 | **Identity** | `SELF_AGENT_ENABLED` | Set to `1` only after the agent wallet has completed Self Agent ID. |
 | **Payments** | `TEXTILE_API_KEY`, `CELO_RESEARCH_URLS`, `BILLING_CELO_ADDRESS` | Textile partner key, x402 research sellers to buy from, and the address that receives customer credit top-ups. |
 | **Research API** | `X402_API_KEY`, `SIGNALS_PUBLIC_URL`, `SIGNALS_SELLER_ADDRESS`, `SIGNALS_API_PORT` | Only for running `services/signals-api`. |
@@ -621,7 +660,8 @@ Full results are in [Validation](docs/celo/VALIDATION.md).
 **Design principles**
 
 - **The agent key is treated as stealable.** Even with it, an attacker can't withdraw, change limits or roles, approve payments, or pay a person without the owner's approval.
-- **The owner is always in control.** From the Wallet page they can freeze spending, remove the agent and withdraw everything not reserved for an open payment.
+- **The owner is always in control.** From the Wallet page they can freeze spending, remove the agent and withdraw everything not reserved for an open payment. In an open campaign they can object to any reward during its 3-day hold, remove GrowTendril's permission and take back unused money.
+- **The browser checks the contract before money moves.** Before funding an open campaign, the page checks that the address holds the reviewed CampaignEscrow code with Celo USDC and a 72-hour hold.
 - **Settled means settled.** A payment counts only after the exact token transfer appears on Celo. An unknown outcome is held for review, never retried blindly.
 - **Secrets stay on the server.** Stored credentials and session keys are encrypted with AES-256-GCM. Keys are never sent to the browser or to a language model.
 - **Hardened web surface.** A content security policy, HSTS, safe outbound HTTP for user-supplied URLs, and HMAC-signed conversion events with replay protection.
@@ -636,8 +676,8 @@ Full results are in [Validation](docs/celo/VALIDATION.md).
 
 | Area | Status |
 |---|---|
-| Contracts | Live on Celo mainnet and source-verified |
-| Web app | Live at [celo.growtendril.xyz](https://celo.growtendril.xyz) |
+| Contracts | Live on Celo mainnet and source-verified, including CampaignEscrow (November 27, 2026) |
+| Web app | Live at [celo.growtendril.xyz](https://celo.growtendril.xyz). Open reward campaigns went live on November 28, 2026 |
 | Fork testing | Contracts and app tested end to end on a private Celo mainnet fork |
 | Live activity | The first workspace contract was created on mainnet on November 25, 2026 ([`0x5f90…ec0c`](https://celoscan.io/address/0x5f904e5647211c854dc48fd4fa5716faa048ec0c)). ERC-8004 and Self registration, Textile FX conversions, x402 payments and payments to outside users have not taken place yet |
 | Agent Vault | Not implemented |
@@ -655,6 +695,8 @@ Entry for Celo's **Agents Open for Business** hackathon.
 | **Altana Agent Wallets** | Passkey-owned workspace wallets with capped, expiring agent session keys |
 
 The entry requirements are supported in the code: ERC-8004 registration (`npm run celo:register`), a public GitHub repository, and the attribution tag on every agent transaction.
+
+Open reward campaigns are how outside users meet the product: a business funds a campaign from its own wallet, and people outside the team join, do the task and get paid on Celo. See [who signs each transaction](#campaignescrow).
 
 ## Documentation
 

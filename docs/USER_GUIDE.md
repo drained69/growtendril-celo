@@ -103,15 +103,54 @@ In **Settings → Spend policy** you set how much the agent may do on its own:
 
 For larger payments, set a mission budget that covers the planned work, choose a per-payment ceiling that fits it, and fund the workspace wallet. Raising these limits does not add USDC. Existing workspaces keep their current effective limits until an owner or admin explicitly saves new rules.
 
-## 8. Run experiments and creator campaigns
+## 8. Run experiments and campaigns
 
 **Experiments** — GrowTendril proposes tests from your opportunities, each with a hypothesis, a
 tracked link, a budget, a time limit and a stop condition. Open one to set who gets paid (for
 non-creator work), record delivery, and see results.
 
-**Creator campaigns** (to pay creators for posts):
+**Reward campaigns** (anyone with the link can join and get paid):
 
-1. Open **Creator campaigns** and create a campaign: topic, platform, brief, number of creators and the reward rules.
+A reward campaign pays a fixed amount to each person who does something for your business, such as
+posting about it with their personal code. USDC is a digital dollar: 1 USDC = $1.
+
+1. Open **Campaigns → New reward campaign**. Say what people should do, how they prove it (a post on X,
+   Bluesky, YouTube, TikTok or any public page), any words the post must include (for example `#ad`),
+   the reward per person, how many people, and how many days it runs. The page shows the total you'll
+   set aside.
+2. **Set the money aside.** Use a wallet on Celo, such as MiniPay, Valora or MetaMask, with the total in
+   USDC and a few cents of CELO for fees. Before anything is sent, the page checks the campaign
+   contract. Your wallet asks twice: once to allow the exact amount, once to set it aside. The money
+   sits in the campaign contract, not with GrowTendril, and can only go to approved people or back to you.
+3. **Share the link** shown on the campaign page. People who join sign your terms with their payout
+   wallet (free, no money moves) and get a personal code to put in their post.
+4. **GrowTendril checks each claim**, usually within a minute: the person signed, it's on time, there's a
+   spot left, nobody sent the same link, and the post shows their code and your required words.
+   - A post that is clearly missing the code or words is sent back, and the person can fix it (3 tries).
+   - Anything GrowTendril can't read or isn't sure about waits for you under **Needs you**:
+     **Approve** or **Turn down**.
+   - With **Automatic approval** on, claims that pass every check are approved for you. Turn it off to
+     approve each one yourself.
+5. **The 3-day hold.** An approved reward waits 3 days before it's paid. During that time you can
+   **Object** from your wallet, and the money goes back into the campaign. After the hold, the reward
+   is sent to the person's wallet automatically.
+6. **Take back unused money** from the campaign page, 7 days after the campaign ends. **Stop taking new
+   people** ends a campaign early; rewards already approved still finish.
+
+You stay in control: **Remove GrowTendril's permission** on the campaign page stops it approving any
+more rewards in that campaign. You then approve each reward from your own wallet. Object, Remove
+permission and Take back unused money must be sent from the wallet that set the money aside. For now
+a campaign can pay at most 50 USDC per person and 500 USDC in total.
+
+**What people who join see:** the campaign page (`/join/…`) explains the task, the reward, the 3-day
+hold and that the money is already set aside, with a link to it on Celoscan. After signing up they:
+agree and sign, do the task with their code, send the link, and see their status until they're paid.
+They can also press **Collect now** once the hold is over. People on your own team can't join your
+campaigns.
+
+**Invite-only creator campaigns** (to invite specific creators you choose):
+
+1. Open **Campaigns**, then **Invite-only creator campaigns**, and create a campaign: topic, platform, brief, number of creators and the reward rules.
 2. Open the campaign and **Invite a creator** from your shortlist. You get a private link — send it to them yourself.
 3. The creator opens the link, accepts the terms, and gives their **payout address** and an ownership proof.
 4. You **verify** the creator. They submit their post through their link.
@@ -180,6 +219,8 @@ can't be withdrawn until it finishes.
 | Run a scan now | **Overview → Run cycle** |
 | Run scans automatically | **Autopilot** (top bar) |
 | Fund payments to creators | **Wallet** → copy address → send Celo USDC |
+| Pay people who post about you | **Campaigns → New reward campaign** |
+| Stop a reward before it's paid | The campaign page → **Object** (within 3 days of approval) |
 | Stop all payments | **Wallet → Freeze spending** |
 | Approve or reject a payment | **Approvals** |
 | See proof of a payment | **Receipts** or **Payment activity** |

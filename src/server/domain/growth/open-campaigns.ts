@@ -16,6 +16,7 @@ import { isPayableAddress } from "@/server/domain/growth/experiments";
 import { currentMonth } from "@/server/domain/growth/monthly-budget";
 import { checkOpenClaim } from "@/server/domain/growth/open-claim-check";
 import type { ProofReader } from "@/server/domain/growth/open-proof";
+import { tellParticipant } from "@/server/domain/growth/open-emails";
 
 /** Chain access, injectable so tests never touch Celo. */
 export interface OpenChain {
@@ -314,6 +315,7 @@ export async function rejectOpenClaim(db: DB, projectId: string, userId: string,
     .where(and(eq(s.openClaims.id, claim.id), inArray(s.openClaims.status, ["needs_owner", "approved_waiting"]))).returning({ id: s.openClaims.id });
   if (!done) throw new Error(claim.status === "queueing" ? "This reward is being set aside on Celo right now. Wait a minute, then object." : "This claim can't be turned down any more");
   await audit(db, { projectId, actorType: "user", actorId: userId, action: target === "objected" ? "open_campaign.object" : "open_campaign.reject", target: claim.id, data: { reason } });
+  await tellParticipant(db, claim.id, target === "objected" ? "objected" : "turned_down");
 }
 
 /** After the owner's wallet sent `object`, record it once Celo shows the reward as objected. */
@@ -322,9 +324,10 @@ export async function confirmOpenObjection(db: DB, projectId: string, userId: st
   const { campaign, claim } = await ownerClaim(db, projectId, programId, claimId);
   const reward = await c.readReward(getAddress(campaign.escrowContract!), campaign.escrowCampaignId as Hex, claim.rewardId as Hex);
   if (reward.status !== "Objected") throw new Error("Celo doesn't show the objection yet. Wait a few seconds and try again.");
-  await db.update(s.openClaims).set({ status: "objected", objectionReason: reason.trim().slice(0, 300) || "The business objected", objectTx: txHash && /^0x[0-9a-f]{64}$/i.test(txHash) ? txHash : null, objectedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(s.openClaims.id, claim.id), inArray(s.openClaims.status, ["approved_queued", "queueing"])));
+  const changed = await db.update(s.openClaims).set({ status: "objected", objectionReason: reason.trim().slice(0, 300) || "The business objected", objectTx: txHash && /^0x[0-9a-f]{64}$/i.test(txHash) ? txHash : null, objectedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(s.openClaims.id, claim.id), inArray(s.openClaims.status, ["approved_queued", "queueing"]))).returning({ id: s.openClaims.id });
   await audit(db, { projectId, actorType: "user", actorId: userId, action: "open_campaign.object", target: claim.id, data: { txHash, reason } });
+  if (changed.length) await tellParticipant(db, claim.id, "objected");
 }
 
 /** Syncs a claim with what Celo says (owner queued it from their wallet, someone collected it, or it was objected). */
@@ -340,16 +343,17 @@ export async function syncOpenClaim(db: DB, claimId: string, chain?: OpenChain) 
 /** Moves a claim to match its reward on Celo. Celo is the source of truth for money. Returns the new status. */
 export async function applyRewardState(db: DB, claim: typeof s.openClaims.$inferSelect, reward: OnchainReward, now = new Date()): Promise<string> {
   const where = and(eq(s.openClaims.id, claim.id), eq(s.openClaims.status, claim.status));
+  const moved = async (rows: unknown[], news: "approved" | "paid" | "objected") => { if (rows.length) await tellParticipant(db, claim.id, news); };
   if (reward.status === "Held" && ["approved_waiting", "queueing", "needs_owner"].includes(claim.status)) {
-    await db.update(s.openClaims).set({ status: "approved_queued", amountMicro: Number(reward.amount), evidenceHash: reward.evidenceHash, claimableAt: new Date(Number(reward.claimableAt) * 1000), queuedAt: claim.queuedAt ?? now, queueError: null, updatedAt: now }).where(where);
+    await moved(await db.update(s.openClaims).set({ status: "approved_queued", amountMicro: Number(reward.amount), evidenceHash: reward.evidenceHash, claimableAt: new Date(Number(reward.claimableAt) * 1000), queuedAt: claim.queuedAt ?? now, queueError: null, updatedAt: now }).where(where).returning({ id: s.openClaims.id }), "approved");
     return "approved_queued";
   }
   if (reward.status === "Paid" && claim.status !== "paid") {
-    await db.update(s.openClaims).set({ status: "paid", amountMicro: Number(reward.amount), paidAt: claim.paidAt ?? now, updatedAt: now }).where(where);
+    await moved(await db.update(s.openClaims).set({ status: "paid", amountMicro: Number(reward.amount), paidAt: claim.paidAt ?? now, updatedAt: now }).where(where).returning({ id: s.openClaims.id }), "paid");
     return "paid";
   }
   if (reward.status === "Objected" && claim.status !== "objected") {
-    await db.update(s.openClaims).set({ status: "objected", objectionReason: claim.objectionReason ?? "The business objected", objectedAt: claim.objectedAt ?? now, updatedAt: now }).where(where);
+    await moved(await db.update(s.openClaims).set({ status: "objected", objectionReason: claim.objectionReason ?? "The business objected", objectedAt: claim.objectedAt ?? now, updatedAt: now }).where(where).returning({ id: s.openClaims.id }), "objected");
     return "objected";
   }
   if (reward.status === "None" && claim.status === "queueing") {

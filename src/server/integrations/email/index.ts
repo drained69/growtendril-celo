@@ -9,7 +9,7 @@ import { newId } from "@/server/lib/ids";
  * Every attempt is recorded in email_log (recipient, kind, outcome; never the body).
  */
 
-export type EmailKind = "verify_code" | "reset_code" | "withdraw_code" | "withdrawal" | "welcome" | "subscription_active" | "renewal_reminder" | "payment_failed" | "subscription_canceled" | "credit_added" | "invite" | "report" | "ledger_alert";
+export type EmailKind = "verify_code" | "reset_code" | "withdraw_code" | "withdrawal" | "welcome" | "subscription_active" | "renewal_reminder" | "payment_failed" | "subscription_canceled" | "credit_added" | "invite" | "report" | "ledger_alert" | "campaign_update";
 
 export interface EmailMessage {
   to: string;

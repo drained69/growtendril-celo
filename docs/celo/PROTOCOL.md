@@ -69,7 +69,7 @@ External dependencies on Celo mainnet (chain 42220):
 - A stolen operator key can clutter a workspace with junk proposals or experiments, and race the owner's ledger checkpoints. It cannot move funds. The owner clears proposals with one rejection, stops experiments, and removes the agent.
 - Funds held by an expired payment stay reserved until anyone cancels it or the owner rejects it.
 - A conversion's minimum payout is fixed when it is proposed. The app refuses to let the owner approve one that is below 85% of Textile's live rate, but approving directly on the contract skips that check.
-- An open campaign's owner must notice an unwanted reward within its 72-hour hold to object. The app lists every reward with a countdown, but doesn't yet send an alert when a reward the app didn't expect appears onchain.
+- An open campaign's owner must act on an unwanted reward within its 72-hour hold to object. The app checks Celo every 5 minutes and emails the owner when a campaign holds more rewards than the app approved, but it relies on the owner reading that email in time.
 - An open campaign's money can be reclaimed only 7 days after its deadline, even if the owner stops it early, so the last approved claims can finish.
 - The app caps open campaigns at 50 USDC per person and 500 USDC per campaign while the contract is unaudited. The contract itself doesn't enforce those caps.
 - The contracts have had an internal review, invariant fuzzing and a partial automated audit, but no independent human audit.

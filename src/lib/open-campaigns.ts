@@ -31,6 +31,8 @@ export const OPEN_LIMITS = { minRewardMicro: 10_000, maxRewardMicro: 50_000_000,
 /** CampaignEscrow's fixed hold (72 h) and review window (7 days after the deadline). */
 export const OPEN_HOLD_SECONDS = 259_200;
 export const OPEN_REVIEW_WINDOW_SECONDS = 604_800;
+/** After the hold, the person has this long to collect the reward from their own wallet before GrowTendril sends it. */
+export const COLLECT_WINDOW_MS = 24 * 3_600_000;
 export const OPEN_TERMS_VERSION = "open-1";
 export const MAX_CLAIM_TRIES = 3;
 /** How long a signed agreement stays valid between signing and joining. */
@@ -81,7 +83,7 @@ export function openTermsText(t: OpenTermsFields): string {
     `How to prove it: ${PROOF_LABEL[t.proofKind]} that shows your personal code or your personal link${words}. Send the link before ${utc(t.endsAt)}.`,
     `Reward: ${usd(t.rewardMicro)} per person (USDC is a digital dollar: 1 USDC = $1), for up to ${t.people} ${t.people === 1 ? "person" : "people"}. One reward per person and per wallet.`,
     `The money: ${usd(t.rewardMicro * t.people)} is set aside in a contract on the Celo network before anyone can join. It can only go to approved people, or back to the business after the campaign.`,
-    `Approval: GrowTendril checks each claim, and the business can check it too. After a reward is approved, the business has 3 days to object. After those 3 days the reward is sent to your wallet automatically.`,
+    `Approval: GrowTendril checks each claim, and the business can check it too. After a reward is approved, the business has 3 days to object. After those 3 days you can collect the reward yourself; if you don't, it is sent to your wallet automatically within a day.`,
     `Unused money goes back to the business 7 days after the campaign ends.`,
   ].join("\n");
 }
@@ -146,7 +148,7 @@ export const CLAIM_STATUS_FOR_PARTICIPANT: Record<string, string> = {
   rejected: "Not accepted",
   approved_waiting: "Approved, getting your reward ready",
   queueing: "Approved, getting your reward ready",
-  approved_queued: "Approved, paying after the 3-day hold",
+  approved_queued: "Approved, ready after the 3-day hold",
   objected: "The business objected, so this reward won't be paid",
   paid: "Paid to your wallet",
 };

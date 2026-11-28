@@ -53,7 +53,7 @@ function fakeEscrow() {
           if (rewards.has(`${id}:${rid}`)) throw new Error("duplicate or invalid recipient");
           if (!agent || c.agent.toLowerCase() !== agent.toLowerCase()) throw new Error("not authorized");
           rewards.set(`${id}:${rid}`, { recipient, amount: c.base, claimableAt: BigInt(clock() + 259_200), evidenceHash, status: "Held" });
-          c.available -= c.base; c.reserved += c.base;
+          c.available -= c.base; c.reserved += c.base; c.queued++;
           return `0x${"1".repeat(64)}` as Hex;
         },
         relay: async (_, id, rid) => {
@@ -272,7 +272,12 @@ describe("open campaign flow", () => {
     expect(escrow.campaigns.get(campaignId)!.reserved).toBe(4_000_000n);
     await job.openEscrowTick(db, agent);
     expect(escrow.calls.relay).toBe(0);
-    const later = new Date(alice.claimableAt!.getTime() + 60_000);
+    // After the hold, people get a day to collect it themselves before GrowTendril sends it.
+    const holdOver = new Date(alice.claimableAt!.getTime() + 60_000);
+    escrow.setClock(() => Math.floor(holdOver.getTime() / 1000));
+    await job.openEscrowTick(db, agent, holdOver, { sweep: false });
+    expect(escrow.calls.relay).toBe(0);
+    const later = new Date(alice.claimableAt!.getTime() + 24 * 3_600_000 + 60_000);
     escrow.setClock(() => Math.floor(later.getTime() / 1000));
     await job.openEscrowTick(db, agent, later); await job.openEscrowTick(db, agent, later);
     expect(escrow.calls.relay).toBe(2); expect(escrow.calls.queue).toBe(2);
@@ -306,7 +311,7 @@ describe("open campaign flow", () => {
     escrow.campaigns.get(id)!.agent = AGENT;
     await job.openEscrowTick(db, escrow.agentFor(reads("")));
     await expect(flow.confirmOpenObjection(db, "project", "owner", second.programId, claim.id, "Fake account", null, escrow.chain)).rejects.toThrow(/doesn't show the objection/);
-    escrow.rewards.get(`${id}:${claim.rewardId}`)!.status = "Objected";
+    escrow.rewards.get(`${id}:${claim.rewardId}`)!.status = "Objected"; escrow.campaigns.get(id)!.queued--;
     await flow.confirmOpenObjection(db, "project", "owner", second.programId, claim.id, "Fake account", null, escrow.chain);
     const [objected] = await db.select().from(s.openClaims).where(eq(s.openClaims.id, claim.id));
     expect(objected.status).toBe("objected"); expect(objected.objectionReason).toBe("Fake account");
@@ -337,6 +342,31 @@ describe("open campaign flow", () => {
     await job.openEscrowTick(db, escrow.agentFor(reads("")), new Date(Date.now() + 6 * 60_000));
     const [settled] = await db.select().from(s.openClaims).where(eq(s.openClaims.participantId, pid));
     expect(settled.status).toBe("approved_queued"); expect(escrow.calls.queue).toBe(before + 1);
+  });
+
+  it("emails people once when approved and once when paid, and the owner when a claim needs them", async () => {
+    const mails = await db.select().from(s.emailLog).where(eq(s.emailLog.kind, "campaign_update"));
+    const to = (who: string, re: RegExp) => mails.filter(m => m.userId === who && re.test(m.subject)).length;
+    // Alice was approved in two campaigns (this one and the lost-receipt one) and paid in one.
+    expect(to("alice", /^Approved:/)).toBe(2); expect(to("alice", /^Paid:/)).toBe(1);
+    expect(to("carol", /^Approved:/)).toBe(1); expect(to("carol", /^Paid:/)).toBe(1);
+    expect(to("bob", /wasn't accepted/)).toBe(1);
+    expect(to("dave", /objected/)).toBe(1);
+    expect(to("owner", /needs you/)).toBe(2);
+  });
+
+  it("alerts the owner once when Celo shows a reward GrowTendril didn't approve", async () => {
+    const { campaign } = await flow.openByProgram(db, "project", programId);
+    const id = campaign.escrowCampaignId as Hex;
+    expect((await job.openEscrowTick(db, escrow.agentFor(reads("")), new Date(), { sweep: true })).alerts).toBe(0);
+    // A stolen agent key approves a stranger directly on the contract.
+    escrow.rewards.set(`${id}:0x${"9".repeat(64)}`, { recipient: "0x00000000000000000000000000000000000000bb", amount: 2_000_000n, claimableAt: BigInt(Math.floor(Date.now() / 1000) + 259_200), evidenceHash: "0x01", status: "Held" });
+    escrow.campaigns.get(id)!.queued++;
+    expect((await job.openEscrowTick(db, escrow.agentFor(reads("")), new Date(), { sweep: true })).alerts).toBe(1);
+    expect((await job.openEscrowTick(db, escrow.agentFor(reads("")), new Date(), { sweep: true })).alerts).toBe(0);
+    const [alert] = await db.select().from(s.ledgerExceptions).where(eq(s.ledgerExceptions.kind, "unexpected_reward"));
+    expect(alert).toMatchObject({ projectId: "project", status: "open", scope: "wallet" });
+    expect(alert.detail).toMatch(/remove GrowTendril's permission/);
   });
 
   it("returns unused money only after the review window, then closes", async () => {

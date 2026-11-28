@@ -10,7 +10,7 @@ import { sendEmail } from "@/server/integrations/email";
  * rounded away or corrected silently.
  */
 
-export type ExceptionKind = "unmatched_payment" | "payout_mismatch" | "payout_unverified" | "unrecorded_outflow";
+export type ExceptionKind = "unmatched_payment" | "payout_mismatch" | "payout_unverified" | "unrecorded_outflow" | "unexpected_reward";
 export type LedgerException = typeof s.ledgerExceptions.$inferSelect;
 
 export const EXCEPTION_LABEL: Record<ExceptionKind, string> = {
@@ -18,6 +18,7 @@ export const EXCEPTION_LABEL: Record<ExceptionKind, string> = {
   payout_mismatch: "Payout differs from what was approved",
   payout_unverified: "Payout couldn't be checked on Celo",
   unrecorded_outflow: "USDC left the wallet without a record",
+  unexpected_reward: "A campaign reward GrowTendril didn't approve",
 };
 
 export interface NewException {

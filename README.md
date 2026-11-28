@@ -361,7 +361,9 @@ Events: `CampaignFunded`, `AgentChanged`, `RewardQueued`, `RewardObjected`, `Rew
 
 **What a stolen agent key can do.** It can only approve rewards in live campaigns that still name it, at the fixed amount, one per address, up to the free spots. Each of those rewards waits 72 hours, and the owner can object to every one and remove the agent with `setAgent`, which returns all of that money to the campaign. The key can never touch a workspace contract, the owner's wallet or another campaign.
 
-**Who signs each transaction.** The business signs the USDC approval, `createCampaign`, `object`, `setAgent` and `refundUnused` from its own wallet. GrowTendril's agent signs `queueReward` for approved claims and relays `claim` after the hold. A participant can also send `claim` for their own reward from their wallet. Every one of these carries the attribution tag at the end of its calldata. Agreeing to the terms is a free wallet signature, not a transaction.
+**Who signs each transaction.** The business signs the USDC approval, `createCampaign`, `object`, `setAgent` and `refundUnused` from its own wallet. GrowTendril's agent signs `queueReward` for approved claims. After the hold, the participant has a day to send `claim` for their own reward from their own wallet; if they don't, GrowTendril's agent relays it. Every one of these carries the attribution tag at the end of its calldata. Agreeing to the terms is a free wallet signature, not a transaction.
+
+**Watching for surprises.** Every 5 minutes the app compares each campaign's reward count on Celo with the claims it approved. If Celo shows more, it opens a ledger exception, emails the owner and shows a warning on the campaign page, while there is still time to object.
 
 ### Guarantees enforced onchain
 
@@ -429,7 +431,7 @@ The full trust model, invariants and known limits are in [the protocol notes](do
 | **Local-currency payout** | Agent proposes a USD₮ payment with a minimum payout → owner approves → app gets a firm Textile FX quote → contract converts and delivers atomically → app confirms delivery |
 | **Paid research (buyer)** | Agent fetches the 402 quote → policy check → signs the exact USDC amount → seller settles on Celo → app records the settlement transaction |
 | **Paid research (seller)** | Caller signs with Self → identity check → x402 payment → research response; failed responses aren't charged |
-| **Open reward campaign** | Business sets the money aside in CampaignEscrow → person joins and signs the terms with their payout wallet → does the task and sends the link → GrowTendril checks it and its agent approves the reward → 72-hour hold, during which the owner can object → the agent (or the person) sends the payout |
+| **Open reward campaign** | Business sets the money aside in CampaignEscrow → person joins and signs the terms with their payout wallet → does the task and sends the link → GrowTendril checks it and its agent approves the reward → 72-hour hold, during which the owner can object → the person collects it from their own wallet, or the agent sends it a day later |
 | **Creator rewards (invite-only)** | Business funds a campaign in escrow → creators deliver → business queues rewards → 72-hour hold, with a dispute path → anyone relays the claim to the creator |
 | **Service credit** | The customer sends USDC to the billing address → the app matches the `Transfer` log to an invoice → credit is added. Native CELO never pays an invoice. |
 

@@ -13,7 +13,7 @@ CampaignEscrow was deployed on November 27, 2026 at 17:53 UTC ([`0xfbb1…859f`]
 | CampaignEscrow fork test against real Celo USDC | Passed: a full open campaign (fund, approve, object, pay, refund) on a mainnet fork |
 | Deployed source | Exact runtime match on Sourcify; the deployment transaction carries the attribution tag |
 | App code check against the live contract | The deployed code passes `isCampaignEscrowCode` and reads back Celo USDC, a 72-hour hold and a 7-day review window; another deployed contract is refused |
-| App tests | 48 files, 459 tests passed, including terms hashing, money caps, join refusals, the claim decision matrix, prompt-injection text, and a payout job that never queues or pays twice when run again or after a lost receipt |
+| App tests | 48 files passed, including terms hashing, money caps, join refusals, the claim decision matrix, prompt-injection text, a payout job that never queues or pays twice when run again or after a lost receipt, the one-day collect window, one email per status change, and the alert for a reward the app didn't approve |
 | TypeScript and production build | Clean |
 | Production deployment | Live at `celo.growtendril.xyz`; the new database tables were created on start and the background job runs without errors |
 
@@ -22,7 +22,7 @@ CampaignEscrow was deployed on November 27, 2026 at 17:53 UTC ([`0xfbb1…859f`]
 - **No campaign has been funded on mainnet yet.** The full flow (fund, join, claim, approve, hold, payout) has run only against a simulated contract in the app tests.
 - **Phone wallets are untested.** Signing the terms and the two funding transactions haven't been tried from MiniPay or MetaMask mobile.
 - **Proof reading against live sites is untested.** X and TikTok embeds and the Bluesky API are read through their public endpoints, which can change or rate-limit.
-- **Cut for now:** an alert when an unexpected reward appears onchain, emails about claims, an AI quality check, and quality or results bonuses.
+- **Cut for now:** an AI quality check, quality or results bonuses, and reading contract events (the app reads each reward and campaign directly instead).
 - **No independent human audit** of CampaignEscrow. The app caps campaigns at 50 USDC per person and 500 USDC in total for now.
 
 ---

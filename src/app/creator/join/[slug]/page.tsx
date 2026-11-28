@@ -7,7 +7,7 @@ import { CopyButton } from "@/components/ui/copy";
 import { CollectButton } from "@/components/features/campaigns/open-chain";
 import { JoinOpenCampaign, ProofForm } from "@/components/features/campaigns/open-forms";
 import { fundingParams, myOpenJoin, openBySlug } from "@/server/domain/growth/open-campaigns";
-import { CLAIM_STATUS_FOR_PARTICIPANT, CLAIM_TONE, MAX_CLAIM_TRIES, PROOF_NOUN, type ProofKind } from "@/lib/open-campaigns";
+import { CLAIM_STATUS_FOR_PARTICIPANT, CLAIM_TONE, COLLECT_WINDOW_MS, MAX_CLAIM_TRIES, PROOF_NOUN, type ProofKind } from "@/lib/open-campaigns";
 import { fmtUsdc } from "@/lib/money";
 import { appOrigin } from "@/server/lib/origin";
 
@@ -69,8 +69,8 @@ export default async function JoinSteps({ params }: { params: Promise<{ slug: st
     <Step n={4} title="Get paid" done={claim?.status === "paid"} active={!!claim && claim.status !== "rejected"}>
       {claim && <>
         <p><Badge tone={CLAIM_TONE[claim.status] ?? "neutral"}>{CLAIM_STATUS_FOR_PARTICIPANT[claim.status] ?? claim.status}</Badge></p>
-        {claim.status === "approved_queued" && claim.claimableAt && !collectable && <p>{fmtUsdc(claim.amountMicro ?? p.baseMicro)} is set aside for you. It&apos;s sent to your wallet automatically after {day(claim.claimableAt)}. Until then, {business} can still object.</p>}
-        {collectable && params2 && <><p>The hold is over. We&apos;re sending it now; you can also collect it yourself (a few cents of CELO for the network fee).</p><CollectButton claimId={claim.id} contract={params2.contract} campaignId={c.escrowCampaignId!} rewardId={claim.rewardId} attribution={params2.attribution} /></>}
+        {claim.status === "approved_queued" && claim.claimableAt && !collectable && <p>{fmtUsdc(claim.amountMicro ?? p.baseMicro)} is set aside for you. From {day(claim.claimableAt)} you can collect it here yourself. Until then, {business} can still object.</p>}
+        {collectable && params2 && <><p>The hold is over. Collect it now from your wallet (it needs a few cents of CELO for the network fee). If you don&apos;t, we&apos;ll send it to your wallet by {day(new Date(claim.claimableAt!.getTime() + COLLECT_WINDOW_MS))}.</p><CollectButton claimId={claim.id} contract={params2.contract} campaignId={c.escrowCampaignId!} rewardId={claim.rewardId} attribution={params2.attribution} /></>}
         {claim.status === "paid" && <p>{fmtUsdc(claim.amountMicro ?? p.baseMicro)} was sent to your wallet. {claim.payTx && <a className="underline" href={`https://celoscan.io/tx/${claim.payTx}`} target="_blank" rel="noopener noreferrer">See it on Celoscan</a>}</p>}
         {claim.status === "objected" && claim.objectionReason && <p className="text-ink-3">Their reason: {claim.objectionReason}</p>}
         {claim.status === "needs_owner" && <p className="text-ink-3">We couldn&apos;t confirm everything automatically, so {business} will look at it.</p>}

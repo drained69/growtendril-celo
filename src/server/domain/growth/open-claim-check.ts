@@ -5,6 +5,7 @@ import { sha256 } from "@/server/lib/ids";
 import { MAX_CLAIM_TRIES, SPOT_TAKING } from "@/lib/open-campaigns";
 import { notify } from "@/server/domain/notifications/webhooks";
 import { proofReader, type ProofRead, type ProofReader } from "@/server/domain/growth/open-proof";
+import { tellOwnerNeedsYou } from "@/server/domain/growth/open-emails";
 
 export type ClaimCheck = { key: string; result: "pass" | "fail" | "unsure"; detail: string };
 export type ClaimDecision = { status: "rejected" | "needs_owner" | "approved_waiting"; checks: ClaimCheck[]; reason: string | null };
@@ -89,6 +90,7 @@ export async function checkOpenClaim(db: DB, claimId: string, read: ProofReader 
   }).where(and(eq(s.openClaims.id, claim.id), eq(s.openClaims.status, "checking"))).returning({ id: s.openClaims.id });
   if (updated.length && decision.status === "needs_owner") {
     await notify(db, campaign.projectId, { event: "creator.post_submitted", key: `open.needs_owner:${claim.id}:${claim.attempts}`, summary: `A claim in "${campaign.title}" needs you`, path: `/app/campaigns/${campaign.programId}`, data: { claim_id: claim.id } });
+    await tellOwnerNeedsYou(db, claim.id);
   }
   return updated.length ? decision : null;
 }

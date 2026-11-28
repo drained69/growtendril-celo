@@ -43,7 +43,7 @@ export default async function JoinPage({ params }: { params: Promise<{ slug: str
     <Card><CardHeader title="How you get paid" /><CardBody className="space-y-2 text-sm text-ink-2">
       <p>1. Join and agree to the terms by signing with your wallet. Signing is free and moves no money.</p>
       <p>2. Do the task and send us the link. GrowTendril checks it, usually within a minute.</p>
-      <p>3. Once approved, the reward waits 3 days. During that time {business} can still object. After that it&apos;s sent to your wallet automatically.</p>
+      <p>3. Once approved, the reward waits 3 days. During that time {business} can still object. After that you can collect it yourself, or we send it to your wallet within a day.</p>
       <p>One reward per person and per wallet.</p>
     </CardBody></Card>
 

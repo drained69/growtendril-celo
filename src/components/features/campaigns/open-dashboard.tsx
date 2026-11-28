@@ -1,4 +1,6 @@
 import { getAddress, type Hex } from "viem";
+import { and, eq, like } from "drizzle-orm";
+import * as s from "@/server/db/schema";
 import type { DB } from "@/server/db/client";
 import { can, type Role } from "@/server/auth/access";
 import { Badge, Callout, Card, CardBody, CardHeader, LinkButton, PageHeader, Stat, StatStrip } from "@/components/ui";
@@ -8,7 +10,7 @@ import { Countdown, OwnerChainButton } from "@/components/features/campaigns/ope
 import { RejectClaimForm } from "@/components/features/campaigns/open-forms";
 import { approveOpenClaimAction, endOpenCampaignAction, setOpenAutoApproveAction } from "@/server/actions/open-campaigns";
 import { fundingParams, liveChain, openByProgram, openClaimsFor, openParticipantCount, reviewEndsAt } from "@/server/domain/growth/open-campaigns";
-import { CAMPAIGN_STATUS_LABEL, CLAIM_STATUS_LABEL, CLAIM_TONE, PROOF_LABEL, SPOT_TAKING, openEvidenceHash, type OnchainCampaign, type ProofKind } from "@/lib/open-campaigns";
+import { CAMPAIGN_STATUS_LABEL, CLAIM_STATUS_LABEL, CLAIM_TONE, COLLECT_WINDOW_MS, PROOF_LABEL, SPOT_TAKING, openEvidenceHash, type OnchainCampaign, type ProofKind } from "@/lib/open-campaigns";
 import { fmtUsdc } from "@/lib/money";
 
 const day = (d: Date) => d.toISOString().slice(0, 16).replace("T", " ") + " UTC";
@@ -16,7 +18,8 @@ const day = (d: Date) => d.toISOString().slice(0, 16).replace("T", " ") + " UTC"
 /** The owner's view of an open campaign: share link, claims to decide, the 3-day objection window, and the money. */
 export async function OpenCampaignDashboard({ db, projectId, programId, role, origin }: { db: DB; projectId: string; programId: string; role: Role; origin: string }) {
   const { campaign: c, program: p } = await openByProgram(db, projectId, programId);
-  const [claims, joined] = await Promise.all([openClaimsFor(db, c.id), openParticipantCount(db, c.id)]);
+  const [claims, joined, alerts] = await Promise.all([openClaimsFor(db, c.id), openParticipantCount(db, c.id),
+    c.escrowCampaignId ? db.select({ detail: s.ledgerExceptions.detail }).from(s.ledgerExceptions).where(and(eq(s.ledgerExceptions.projectId, projectId), eq(s.ledgerExceptions.kind, "unexpected_reward"), eq(s.ledgerExceptions.status, "open"), like(s.ledgerExceptions.ref, `${c.escrowCampaignId}:%`))) : Promise.resolve([])]);
   const chain = await liveChain();
   let onchain: OnchainCampaign | null = null;
   if (c.escrowCampaignId && c.escrowContract) { try { onchain = await chain.readCampaign(getAddress(c.escrowContract), c.escrowCampaignId as Hex); } catch { onchain = null; } }
@@ -35,6 +38,7 @@ export async function OpenCampaignDashboard({ db, projectId, programId, role, or
   return <div className="space-y-5">
     <PageHeader title={c.title} description={`${CAMPAIGN_STATUS_LABEL[c.status] ?? c.status} · open to anyone with the link · ${fmtUsdc(p.baseMicro)} per person`}
       actions={<><LinkButton href="/app/campaigns">All campaigns</LinkButton>{funded && <LinkButton href={`/join/${c.slug}`} external>Open the public page</LinkButton>}</>} />
+    {alerts.length > 0 && <Callout tone="danger" title="A reward GrowTendril didn't approve is on Celo">{alerts[alerts.length - 1].detail} You can mark it resolved on the Payout account page once you know what happened.</Callout>}
     {!funded && c.status !== "closed" && <Callout tone="warn" title="Set the money aside to open this campaign" action={canDecide ? <LinkButton href={`/app/campaigns/${programId}/fund`} variant="primary">Set the money aside</LinkButton> : undefined}>
       People can join only after {fmtUsdc(p.baseMicro * p.slots)} is held in the campaign contract on Celo. It comes from your own wallet; GrowTendril never holds it.
     </Callout>}
@@ -60,7 +64,7 @@ export async function OpenCampaignDashboard({ db, projectId, programId, role, or
             {x.rejectReason && <p className="text-xs text-ink-3">Reason given: {x.rejectReason}</p>}
             {x.objectionReason && <p className="text-xs text-ink-3">Your objection: {x.objectionReason}</p>}
             {x.queueError && ["approved_waiting", "queueing", "needs_owner"].includes(x.status) && <p className="text-xs text-warning">{x.queueError}</p>}
-            {x.status === "approved_queued" && x.claimableAt && <p className="text-sm">{holdOver ? "The hold is over; it's being paid now." : <>You can object until {day(x.claimableAt)} (<Countdown until={x.claimableAt.toISOString()} />). After that it&apos;s paid automatically.</>}</p>}
+            {x.status === "approved_queued" && x.claimableAt && <p className="text-sm">{holdOver ? <>The hold is over. They can collect it now; otherwise GrowTendril sends it by {day(new Date(x.claimableAt.getTime() + COLLECT_WINDOW_MS))}.</> : <>You can object until {day(x.claimableAt)} (<Countdown until={x.claimableAt.toISOString()} />). After that it&apos;s paid.</>}</p>}
             {x.status === "paid" && x.payTx && <a className="text-xs underline" href={`https://celoscan.io/tx/${x.payTx}`} target="_blank" rel="noopener noreferrer">Payment on Celoscan</a>}
             {!!x.checks.length && <details className="text-xs text-ink-3"><summary className="cursor-pointer">What GrowTendril checked</summary><ul className="mt-2 space-y-1">{x.checks.map(k => <li key={k.key}>{k.result === "pass" ? "✓" : k.result === "fail" ? "✗" : "?"} {k.detail}</li>)}</ul></details>}
             {canDecide && <div className="flex flex-wrap items-start gap-2">

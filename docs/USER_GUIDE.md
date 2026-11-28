@@ -132,8 +132,10 @@ posting about it with their personal code. USDC is a digital dollar: 1 USDC = $1
    - With **Automatic approval** on, claims that pass every check are approved for you. Turn it off to
      approve each one yourself.
 5. **The 3-day hold.** An approved reward waits 3 days before it's paid. During that time you can
-   **Object** from your wallet, and the money goes back into the campaign. After the hold, the reward
-   is sent to the person's wallet automatically.
+   **Object** from your wallet, and the money goes back into the campaign. After the hold, the person
+   has a day to collect it from their own wallet; if they don't, GrowTendril sends it to them.
+   You get an email when a claim needs you, and if Celo ever shows a reward GrowTendril didn't
+   approve, the campaign page warns you while there's still time to object.
 6. **Take back unused money** from the campaign page, 7 days after the campaign ends. **Stop taking new
    people** ends a campaign early; rewards already approved still finish.
 
@@ -145,8 +147,8 @@ a campaign can pay at most 50 USDC per person and 500 USDC in total.
 **What people who join see:** the campaign page (`/join/…`) explains the task, the reward, the 3-day
 hold and that the money is already set aside, with a link to it on Celoscan. After signing up they:
 agree and sign, do the task with their code, send the link, and see their status until they're paid.
-They can also press **Collect now** once the hold is over. People on your own team can't join your
-campaigns.
+They get an email when they're approved and when they're paid, and can press **Collect now** once the
+hold is over. People on your own team can't join your campaigns.
 
 **Invite-only creator campaigns** (to invite specific creators you choose):
 

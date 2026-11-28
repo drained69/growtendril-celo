@@ -1,10 +1,12 @@
-import { and, asc, eq, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getAddress, type Address, type Hex } from "viem";
 import type { DB } from "@/server/db/client";
 import * as s from "@/server/db/schema";
 import { audit } from "@/server/db/helpers";
-import { openEvidenceHash, type OnchainCampaign, type OnchainReward } from "@/lib/open-campaigns";
+import { COLLECT_WINDOW_MS, openEvidenceHash, type OnchainCampaign, type OnchainReward } from "@/lib/open-campaigns";
 import { applyRewardState, reviewEndsAt } from "@/server/domain/growth/open-campaigns";
+import { tellParticipant } from "@/server/domain/growth/open-emails";
+import { openException } from "@/server/domain/reconcile/exceptions";
 
 /** What the job needs from Celo and the claim checker; injectable so tests never touch the chain. */
 export interface EscrowAgent {
@@ -32,12 +34,13 @@ const short = (e: unknown) => String((e as { shortMessage?: string; message?: st
 
 /**
  * Runs every minute. Ends campaigns past their date, retries unfinished claim checks, sets approved
- * rewards aside on Celo as GrowTendril's agent, and sends each reward to its person once the 3-day hold
- * has passed. Reads each reward from Celo before acting, so running it twice never pays anyone twice.
+ * rewards aside on Celo as GrowTendril's agent, and sends each reward to its person a day after the
+ * 3-day hold if they haven't collected it themselves. Reads each reward from Celo before acting, so
+ * running it twice never pays anyone twice.
  */
-export async function openEscrowTick(db: DB, agent?: EscrowAgent, now = new Date()) {
+export async function openEscrowTick(db: DB, agent?: EscrowAgent, now = new Date(), opts: { sweep?: boolean } = {}) {
   const a = agent ?? await liveEscrowAgent();
-  const out = { ended: 0, checked: 0, queued: 0, paid: 0, synced: 0, errors: [] as string[] };
+  const out = { ended: 0, checked: 0, queued: 0, paid: 0, synced: 0, alerts: 0, errors: [] as string[] };
 
   out.ended = (await db.update(s.openCampaigns).set({ status: "ended", updatedAt: now })
     .where(and(eq(s.openCampaigns.status, "live"), lt(s.openCampaigns.endsAt, now))).returning({ id: s.openCampaigns.id })).length;
@@ -63,15 +66,17 @@ export async function openEscrowTick(db: DB, agent?: EscrowAgent, now = new Date
         continue;
       }
       if (claim.status === "approved_queued") {
-        if (!claim.claimableAt || claim.claimableAt > now) continue;
+        // The person gets a day after the hold to collect it from their own wallet; then GrowTendril sends it.
+        if (!claim.claimableAt || claim.claimableAt.getTime() + COLLECT_WINDOW_MS > now.getTime()) continue;
         const reward = await a.readReward(contract, id, rewardId);
         if (reward.status !== "Held") { await applyRewardState(db, claim, reward, now); out.synced++; continue; }
         if (BigInt(Math.floor(now.getTime() / 1000)) < reward.claimableAt) continue;
         const hash = await a.relay(contract, id, rewardId);
         await db.update(s.openClaims).set({ payTx: hash, updatedAt: now }).where(eq(s.openClaims.id, claim.id));
         if (await a.wait(hash)) {
-          await db.update(s.openClaims).set({ status: "paid", paidAt: now, amountMicro: Number(reward.amount), updatedAt: now }).where(and(eq(s.openClaims.id, claim.id), eq(s.openClaims.status, "approved_queued")));
+          const paid = await db.update(s.openClaims).set({ status: "paid", paidAt: now, amountMicro: Number(reward.amount), updatedAt: now }).where(and(eq(s.openClaims.id, claim.id), eq(s.openClaims.status, "approved_queued"))).returning({ id: s.openClaims.id });
           await audit(db, { projectId: campaign.projectId, actorType: "agent", action: "open_campaign.paid", target: claim.id, data: { txHash: hash, amountMicro: Number(reward.amount), to } });
+          if (paid.length) await tellParticipant(db, claim.id, "paid");
           out.paid++;
         }
         continue;
@@ -119,6 +124,28 @@ export async function openEscrowTick(db: DB, agent?: EscrowAgent, now = new Date
       }
     } catch (e) {
       out.errors.push(`${claim.status} ${claim.id}: ${short(e)}`);
+    }
+  }
+
+  // Every 5 minutes: each reward on Celo must belong to a claim GrowTendril knows. More rewards than
+  // that means someone with permission (the owner outside the app, or a stolen agent key) approved one.
+  if (opts.sweep ?? now.getUTCMinutes() % 5 === 0) {
+    const funded = await db.select().from(s.openCampaigns)
+      .where(and(inArray(s.openCampaigns.status, ["live", "ended"]), isNotNull(s.openCampaigns.escrowCampaignId), isNotNull(s.openCampaigns.escrowContract)));
+    for (const c of funded) {
+      try {
+        const id = c.escrowCampaignId as Hex;
+        const onchain = campaigns.get(id) ?? await a.readCampaign(getAddress(c.escrowContract!), id);
+        const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(s.openClaims)
+          .where(and(eq(s.openClaims.openCampaignId, c.id), inArray(s.openClaims.status, ["approved_waiting", "queueing", "approved_queued", "paid"])));
+        if (onchain.queued > BigInt(n)) {
+          const opened = await openException(db, { scope: "wallet", projectId: c.projectId, kind: "unexpected_reward", ref: `${id}:${onchain.queued}`,
+            detail: `Celo shows ${onchain.queued} approved rewards in the campaign "${c.title}", but GrowTendril approved only ${n}. Someone with permission approved a reward GrowTendril doesn't know about. If it wasn't you, open the campaign, remove GrowTendril's permission, and object to any reward you don't recognise before its 3-day hold ends.` });
+          if (opened) out.alerts++;
+        }
+      } catch (e) {
+        out.errors.push(`sweep ${c.id}: ${short(e)}`);
+      }
     }
   }
   return out;

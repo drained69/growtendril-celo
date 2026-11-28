@@ -7,7 +7,7 @@ import * as s from "@/server/db/schema";
 import { audit, nextNumber } from "@/server/db/helpers";
 import { newId, shortCode } from "@/server/lib/ids";
 import {
-  AGREEMENT_MAX_AGE_MS, CELO_USDC, MAX_CLAIM_TRIES, OPEN_REVIEW_WINDOW_SECONDS, OPEN_TERMS_VERSION, OpenCampaignInput, PROOF_HOSTS, PROOF_LABEL, SLUG_RE, SPOT_TAKING, ZERO_ADDRESS,
+  AGREEMENT_MAX_AGE_MS, CELO_USDC, MAX_CLAIM_TRIES, OPEN_REVIEW_WINDOW_SECONDS, OPEN_TERMS_VERSION, OpenCampaignInput, PROOF_HOSTS, PROOF_NOUN, SLUG_RE, SPOT_TAKING, ZERO_ADDRESS,
   agreementMessage, openCampaignKey, openEconomics, openRewardId, openSalt, openTermsHash, openTermsText, slugify,
   type OnchainCampaign, type OnchainReward, type ProofKind,
 } from "@/lib/open-campaigns";
@@ -258,7 +258,7 @@ export async function submitOpenClaim(db: DB, userId: string, participantId: str
   if (c.status !== "live" || !c.endsAt || c.endsAt <= new Date()) throw new Error("This campaign has stopped taking proof");
   const proofUrl = publicLink(proofInput);
   const host = new URL(proofUrl).hostname.toLowerCase(), kind = c.proofKind as ProofKind;
-  if (kind !== "link" && !PROOF_HOSTS[kind].test(host)) throw new Error(`Send the link to ${PROOF_LABEL[kind].toLowerCase()}`);
+  if (kind !== "link" && !PROOF_HOSTS[kind].test(host)) throw new Error(`Send the link to ${PROOF_NOUN[kind]}`);
   const claimId = await locked(db, `open:${c.id}`, async db => {
     const [dup] = await db.select({ id: s.openClaims.id, participant: s.openClaims.participantId }).from(s.openClaims).where(and(eq(s.openClaims.openCampaignId, c.id), eq(s.openClaims.proofUrl, proofUrl)));
     if (dup && dup.participant !== participantId) throw new Error("Someone else already sent this link");

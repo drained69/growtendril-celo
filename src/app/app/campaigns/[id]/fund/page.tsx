@@ -26,7 +26,7 @@ export default async function FundOpenCampaignPage({ params }: { params: Promise
       <p className="text-sm text-ink-2">The money moves from your wallet into GrowTendril&apos;s campaign contract on the Celo network. Only approved people can receive it, after a 3-day hold in which you can object. Anything unused comes back to you 7 days after the campaign ends.</p>
     </CardBody></Card>
     <Card><CardHeader title="What you need" /><CardBody className="space-y-2 text-sm text-ink-2">
-      <p>• A wallet on Celo, such as MiniPay, Valora or MetaMask, holding at least <strong>{fmtUsdc(total)}</strong> in USDC. USDC is a digital dollar: 1 USDC = $1.</p>
+      <p>• A wallet on Celo, such as MiniPay, Valora or MetaMask, holding at least <strong>{fmtUsdc(total)}</strong>. USDC is a digital dollar: 1 USDC = $1.</p>
       <p>• A few cents of CELO in the same wallet to pay the network fees.</p>
       <p>• Use a normal wallet you control. Your wallet will ask you to confirm twice: once to allow the exact amount, once to set it aside.</p>
     </CardBody></Card>

@@ -16,6 +16,8 @@ export const PROOF_LABEL: Record<ProofKind, string> = {
   tiktok: "A TikTok video",
   link: "Any public web page (a blog post, a review, a listing)",
 };
+/** The same, mid-sentence. */
+export const PROOF_NOUN: Record<ProofKind, string> = { x: "a post on X", bluesky: "a post on Bluesky", youtube: "a YouTube video", tiktok: "a TikTok video", link: "a public web page" };
 /** Where a proof link of each kind may point. `link` accepts any public page. */
 export const PROOF_HOSTS: Record<Exclude<ProofKind, "link">, RegExp> = {
   x: /^((www|mobile)\.)?(x|twitter)\.com$/,

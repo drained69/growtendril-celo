@@ -7,7 +7,7 @@ import { CopyButton } from "@/components/ui/copy";
 import { CollectButton } from "@/components/features/campaigns/open-chain";
 import { JoinOpenCampaign, ProofForm } from "@/components/features/campaigns/open-forms";
 import { fundingParams, myOpenJoin, openBySlug } from "@/server/domain/growth/open-campaigns";
-import { CLAIM_STATUS_FOR_PARTICIPANT, CLAIM_TONE, MAX_CLAIM_TRIES, PROOF_LABEL, type ProofKind } from "@/lib/open-campaigns";
+import { CLAIM_STATUS_FOR_PARTICIPANT, CLAIM_TONE, MAX_CLAIM_TRIES, PROOF_NOUN, type ProofKind } from "@/lib/open-campaigns";
 import { fmtUsdc } from "@/lib/money";
 import { appOrigin } from "@/server/lib/origin";
 
@@ -62,7 +62,7 @@ export default async function JoinSteps({ params }: { params: Promise<{ slug: st
       {claim && claim.status === "rejected" && <p className="text-critical">{claim.rejectReason}</p>}
       {mine && (!claim || canResend) && open && <ProofForm participantId={mine.participant.id} placeholder={PLACEHOLDER[c.proofKind as ProofKind]} label={claim ? "Send it again" : "Send my proof"} />}
       {mine && !claim && !open && <p className="text-ink-3">The campaign has ended, so proof can&apos;t be sent any more.</p>}
-      {!claim && <p className="text-xs text-ink-3">Send the link to {PROOF_LABEL[c.proofKind as ProofKind].toLowerCase()}. It must be public.</p>}
+      {!claim && <p className="text-xs text-ink-3">Send the link to {PROOF_NOUN[c.proofKind as ProofKind]}. It must be public.</p>}
       {claim && claim.status !== "rejected" && <a className="break-all underline" href={claim.proofUrl} target="_blank" rel="noopener noreferrer">{claim.proofUrl}</a>}
     </Step>
 

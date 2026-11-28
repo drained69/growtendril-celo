@@ -4,7 +4,7 @@ import { currentUser } from "@/server/auth/current";
 import { getDb } from "@/server/db/client";
 import { Callout, Card, CardBody, CardHeader, LinkButton } from "@/components/ui";
 import { openBySlug, takenSpots } from "@/server/domain/growth/open-campaigns";
-import { PROOF_LABEL, type ProofKind } from "@/lib/open-campaigns";
+import { PROOF_NOUN, type ProofKind } from "@/lib/open-campaigns";
 import { fmtUsdc } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -31,13 +31,13 @@ export default async function JoinPage({ params }: { params: Promise<{ slug: str
     <div className="space-y-2">
       <p className="text-sm text-ink-3">{business} is paying people to help</p>
       <h1 className="text-3xl font-semibold tracking-tight">{c.title}</h1>
-      <p className="text-lg">Earn <strong>{fmtUsdc(p.baseMicro)}</strong> in USDC <span className="text-ink-3">(a digital dollar: 1 USDC = $1)</span></p>
+      <p className="text-lg">Earn <strong>{fmtUsdc(p.baseMicro)}</strong> <span className="text-ink-3">(USDC is a digital dollar: 1 USDC = $1)</span></p>
       <p className="text-sm text-ink-3">{Math.max(0, p.slots - taken)} of {p.slots} spots left · {c.endsAt ? `ends ${day(c.endsAt)}` : ""}</p>
     </div>
 
     <Card><CardHeader title="What to do" /><CardBody className="space-y-3 text-sm">
       <p className="whitespace-pre-wrap">{c.task}</p>
-      <p className="text-ink-2">Then send us the link: {PROOF_LABEL[c.proofKind as ProofKind].toLowerCase()} that shows the personal code you get when you join{c.requiredText ? <>, and the words <strong>{c.requiredText}</strong></> : ""}.</p>
+      <p className="text-ink-2">Then send us the link to {PROOF_NOUN[c.proofKind as ProofKind]} that shows the personal code you get when you join{c.requiredText ? <>, and the words <strong>{c.requiredText}</strong></> : ""}.</p>
     </CardBody></Card>
 
     <Card><CardHeader title="How you get paid" /><CardBody className="space-y-2 text-sm text-ink-2">

@@ -96,6 +96,11 @@ export async function readPage(url: string, maxChars = 15_000): Promise<PageText
   try {
     const r = await getPublicText(u, {
       headers: { "User-Agent": USER_AGENT, Accept: "text/html,text/plain,text/markdown" },
+      // Big or slow sites: keep the first 600 KB (the text that describes the business comes first)
+      // instead of failing, and allow time for robots.txt plus a slow server.
+      maxBytes: 600_000,
+      truncate: true,
+      timeoutMs: 20_000,
       beforeRequest: async (target) => {
         const rules = await disallowedPaths(target.origin);
         let best = -1;

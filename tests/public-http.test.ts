@@ -83,4 +83,33 @@ describe("public-only outbound requests", () => {
     respond(200, { "content-length": "10" }, "1234567890");
     await expect(getPublicText("https://example.com", { maxBytes: 5 })).rejects.toThrow(/too large/);
   });
+
+  it("keeps the first part of a large page when asked to, instead of failing", async () => {
+    respond(200, { "content-type": "text/html" }, "123456789");
+    expect(await getPublicText("https://example.com", { maxBytes: 5, truncate: true })).toMatchObject({ ok: true, text: "12345", truncated: true });
+    respond(200, { "content-type": "text/html", "content-length": "9" }, "123456789");
+    expect(await getPublicText("https://example.com", { maxBytes: 5, truncate: true })).toMatchObject({ ok: true, text: "12345", truncated: true });
+    respond(200, { "content-type": "text/html" }, "1234");
+    const small = await getPublicText("https://example.com", { maxBytes: 5, truncate: true });
+    expect(small).toMatchObject({ text: "1234" });
+    expect(small.truncated).toBeUndefined();
+  });
+
+  it("says a response was too large, not interrupted, when the stream aborts first", async () => {
+    mocks.request.mockImplementationOnce((_url, _options, handler) => {
+      const req = new EventEmitter() as EventEmitter & { end: () => void; destroy: (error: Error) => void };
+      req.destroy = (error) => { req.emit("error", error); req.emit("close"); };
+      req.end = () => queueMicrotask(() => {
+        const res = new EventEmitter() as EventEmitter & { statusCode: number; headers: Record<string, string>; destroy: (error?: Error) => void };
+        res.statusCode = 200;
+        res.headers = {};
+        // Node can report "aborted" before the destroy error reaches "error".
+        res.destroy = (error) => { res.emit("aborted"); if (error) res.emit("error", error); req.emit("close"); };
+        handler(res);
+        res.emit("data", Buffer.from("123456"));
+      });
+      return req;
+    });
+    await expect(getPublicText("https://example.com", { maxBytes: 5 })).rejects.toThrow(/too large/);
+  });
 });

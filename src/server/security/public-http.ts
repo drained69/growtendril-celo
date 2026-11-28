@@ -47,6 +47,8 @@ export interface PublicTextResponse {
   contentType: string;
   text: string;
   headers: Record<string, string>;
+  /** Only the first `maxBytes` were kept (with `truncate`), because the response was larger. */
+  truncated?: boolean;
 }
 
 /** Pin the connection to the checked DNS answer; validating then using fetch permits rebinding. */
@@ -58,6 +60,8 @@ export async function getPublicText(value: string | URL, opts: {
   body?: string;
   redirect?: "follow" | "error";
   beforeRequest?: (url: URL) => Promise<void>;
+  /** Keep the first `maxBytes` of a larger response instead of failing. For reading web pages, whose useful text comes first. */
+  truncate?: boolean;
 } = {}): Promise<PublicTextResponse> {
   const deadline = Date.now() + (opts.timeoutMs ?? 12_000);
   const maxBytes = opts.maxBytes ?? 600_000;
@@ -76,7 +80,12 @@ export async function getPublicText(value: string | URL, opts: {
       throw new Error("Only public websites are supported; private network addresses are blocked");
     }
     const address = addresses[0];
-    const result = await new Promise<{ status: number; location?: string; contentType: string; text: string; headers: Record<string, string> }>((resolve, reject) => {
+    const result = await new Promise<{ status: number; location?: string; contentType: string; text: string; headers: Record<string, string>; truncated?: boolean }>((resolveOnce, rejectOnce) => {
+      // A destroyed response can emit "aborted", "error" and "close" in either order; the first outcome wins.
+      let settled = false;
+      let tooLarge = false;
+      const resolve = (v: Parameters<typeof resolveOnce>[0]) => { if (!settled) { settled = true; resolveOnce(v); } };
+      const reject = (e: unknown) => { if (!settled) { settled = true; rejectOnce(e); } };
       const request = url.protocol === "https:" ? httpsRequest : httpRequest;
       const req = request(url, {
         method: opts.method ?? "GET",
@@ -89,7 +98,7 @@ export async function getPublicText(value: string | URL, opts: {
         },
       }, (res) => {
         res.on("error", reject);
-        res.on("aborted", () => reject(new Error("Website response was interrupted")));
+        res.on("aborted", () => reject(new Error(tooLarge ? "Website response is too large" : "Website response was interrupted")));
         const status = res.statusCode ?? 0;
         const location = res.headers.location;
         const responseHeaders = Object.fromEntries(Object.entries(res.headers).filter((entry) => entry[1] !== undefined).map(([key, value]) => [key, Array.isArray(value) ? value.join(", ") : String(value)]));
@@ -98,18 +107,28 @@ export async function getPublicText(value: string | URL, opts: {
           res.destroy();
           return;
         }
-        if (Number(res.headers["content-length"]) > maxBytes) {
+        const contentType = res.headers["content-type"] ?? "";
+        if (!opts.truncate && Number(res.headers["content-length"]) > maxBytes) {
+          tooLarge = true;
           res.destroy(new Error("Website response is too large"));
           return;
         }
         const chunks: Buffer[] = [];
         let bytes = 0;
         res.on("data", (chunk: Buffer) => {
+          if (settled) return;
           bytes += chunk.length;
-          if (bytes > maxBytes) res.destroy(new Error("Website response is too large"));
-          else chunks.push(chunk);
+          if (bytes <= maxBytes) { chunks.push(chunk); return; }
+          if (opts.truncate) {
+            chunks.push(chunk.subarray(0, chunk.length - (bytes - maxBytes)));
+            resolve({ status, contentType, text: Buffer.concat(chunks).toString("utf8"), headers: responseHeaders, truncated: true });
+            res.destroy();
+            return;
+          }
+          tooLarge = true;
+          res.destroy(new Error("Website response is too large"));
         });
-        res.on("end", () => resolve({ status, contentType: res.headers["content-type"] ?? "", text: Buffer.concat(chunks).toString("utf8"), headers: responseHeaders }));
+        res.on("end", () => resolve({ status, contentType, text: Buffer.concat(chunks).toString("utf8"), headers: responseHeaders }));
       });
       const timer = setTimeout(() => req.destroy(new Error("Website request timed out")), Math.max(1, deadline - Date.now()));
       req.on("error", reject);
@@ -125,7 +144,7 @@ export async function getPublicText(value: string | URL, opts: {
       url = target;
       continue;
     }
-    return { url: url.toString(), status: result.status, ok: result.status >= 200 && result.status < 300, contentType: result.contentType, text: result.text, headers: result.headers };
+    return { url: url.toString(), status: result.status, ok: result.status >= 200 && result.status < 300, contentType: result.contentType, text: result.text, headers: result.headers, ...(result.truncated ? { truncated: true } : {}) };
   }
   throw new Error("Website redirected too many times");
 }

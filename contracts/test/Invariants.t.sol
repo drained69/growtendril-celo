@@ -5,6 +5,7 @@ import {GrowthFactory} from "../src/protocol/GrowthFactory.sol";
 import {GrowthWorkspace} from "../src/protocol/GrowthWorkspace.sol";
 import {GrowthLedger} from "../src/protocol/GrowthLedger.sol";
 import {OutcomeRewardsEscrow} from "../src/OutcomeRewardsEscrow.sol";
+import {CampaignEscrow} from "../src/CampaignEscrow.sol";
 
 interface InvVm { function warp(uint256) external; function prank(address) external; }
 
@@ -524,5 +525,200 @@ contract GrowthLedgerInvariants is Bounded {
     }
     function invariant_outcomeTotalsNeverFall() public view {
         require(!handler.totalsFell(), "outcome totals fell");
+    }
+}
+
+/// Random actions on open-campaign escrow by owners, their current agents, removed agents and strangers.
+contract CampaignEscrowHandler is Bounded {
+    CampaignEscrow public immutable escrow;
+    InvToken public immutable token;
+    address public constant STRANGER = address(0x5757);
+    address[3] public funders = [address(0xF1), address(0xF2), address(0xF3)];
+    address[3] public agents = [address(0xA1), address(0xA2), address(0xA3)];
+    address[4] public recipients = [address(0xD1), address(0xD2), address(0xD3), address(0xD4)];
+    bytes32[] public campaigns;
+    bytes32[] public rewardCampaign;
+    bytes32[] public rewardIds;
+    mapping(bytes32 => uint256) public timesPaid;
+    mapping(bytes32 => uint256) public maxPerReward;
+    bool public doublePaid;
+    bool public objectedPaid;
+    bool public unauthorizedQueue;
+    bool public overTerms;
+    bool public badTiming;
+    mapping(string => uint256) public hits;
+    uint256 private n;
+
+    struct Terms { uint256 b; uint256 q; uint256 o; uint256 c; uint256 s; uint256 budget; uint256 deadline; address agent; }
+
+    constructor(CampaignEscrow escrow_, InvToken token_) { escrow = escrow_; token = token_; }
+    function campaignCount() external view returns (uint256) { return campaigns.length; }
+    function rewardCount() external view returns (uint256) { return rewardIds.length; }
+
+    function create(uint256 who, uint256 seed, uint256 base, uint256 quality, uint256 outcome) external {
+        Terms memory t;
+        t.b = bound(base, 1, 5e6);
+        t.q = bound(quality, 0, 5e6);
+        t.o = bound(outcome, 0, 1e6);
+        uint256 r = uint256(keccak256(abi.encode(seed)));
+        t.c = bound(r & 0xff, 0, 5);
+        t.s = bound((r >> 8) & 0xff, 1, 5);
+        t.budget = (t.b + t.q + t.o * t.c) * t.s + bound((r >> 16) & 0xffffffff, 0, 10e6);
+        t.deadline = block.timestamp + bound((r >> 64) & 0xff, 1, 5) * 1 days;
+        t.agent = (r >> 96) % 4 == 3 ? address(0) : agents[(r >> 96) % 3];
+        _create(funders[who % 3], t);
+    }
+    function _create(address funder, Terms memory t) private {
+        bytes32 salt = keccak256(abi.encode("salt", ++n));
+        token.mint(funder, t.budget);
+        vm.prank(funder); token.approve(address(escrow), t.budget);
+        vm.prank(funder);
+        try escrow.createCampaign(salt, t.agent, t.deadline, t.budget, t.b, t.q, t.o, t.c, t.s, keccak256("terms")) {
+            bytes32 id = escrow.campaignKey(funder, salt);
+            campaigns.push(id);
+            maxPerReward[id] = t.b + t.q + t.o * t.c;
+            hits["create"]++;
+        } catch {}
+    }
+    function setAgent(uint256 seed, uint256 agentSeed) external {
+        if (campaigns.length == 0) return;
+        bytes32 c = campaigns[seed % campaigns.length];
+        vm.prank(_owner(c));
+        try escrow.setAgent(c, agentSeed % 4 == 3 ? address(0) : agents[agentSeed % 3]) { hits["setAgent"]++; } catch {}
+    }
+    function _owner(bytes32 c) private view returns (address owner) { (owner,,,,,,,,,,,) = escrow.campaigns(c); }
+    function _agent(bytes32 c) private view returns (address agent) { (, agent,,,,,,,,,,) = escrow.campaigns(c); }
+    /// actor 0 = owner, 1 = current agent, 2 = some other agent (possibly removed), 3 = stranger.
+    function _sender(bytes32 c, uint256 actor, uint256 seed) private view returns (address) {
+        uint256 a = actor % 4;
+        return a == 0 ? _owner(c) : a == 1 ? _agent(c) : a == 2 ? agents[seed % 3] : STRANGER;
+    }
+    function queue(uint256 seed, uint256 actor, uint256 who, uint256 quality, uint256 outcomes) external {
+        if (campaigns.length == 0) return;
+        bytes32 c = campaigns[seed % campaigns.length];
+        address sender = _sender(c, actor, seed);
+        address recipient = recipients[who % 4];
+        bool allowed = sender == _owner(c) || (sender == _agent(c) && sender != address(0) && !escrow.objectedTo(c, recipient));
+        bytes32 rewardId = keccak256(abi.encode("reward", ++n));
+        vm.prank(sender);
+        try escrow.queueReward(c, rewardId, recipient, bound(quality, 0, 100), bound(outcomes, 0, 5), keccak256("evidence")) {
+            if (!allowed) unauthorizedQueue = true;
+            (, uint256 amount,,,,,) = escrow.rewards(c, rewardId);
+            if (amount > maxPerReward[c]) overTerms = true;
+            rewardCampaign.push(c); rewardIds.push(rewardId);
+            hits["queue"]++;
+        } catch {}
+    }
+    /// actor 0 = owner, 1 = agent, 2 = recipient, 3 = stranger.
+    function object(uint256 seed, uint256 actor) external {
+        if (rewardIds.length == 0) return;
+        uint256 k = seed % rewardIds.length;
+        bytes32 c = rewardCampaign[k];
+        (address recipient,,,, uint256 claimableAt,,) = escrow.rewards(c, rewardIds[k]);
+        uint256 a = actor % 4;
+        address sender = a == 0 ? _owner(c) : a == 1 ? _agent(c) : a == 2 ? recipient : STRANGER;
+        vm.prank(sender);
+        try escrow.object(c, rewardIds[k], keccak256("reason")) {
+            if (sender != _owner(c) || block.timestamp >= claimableAt) badTiming = true;
+            hits["object"]++;
+        } catch {}
+    }
+    function claim(uint256 seed) external {
+        if (rewardIds.length == 0) return;
+        uint256 k = seed % rewardIds.length;
+        (address recipient, uint256 amount,,, uint256 claimableAt,, CampaignEscrow.Status before) = escrow.rewards(rewardCampaign[k], rewardIds[k]);
+        uint256 balance = token.balanceOf(recipient);
+        vm.prank(STRANGER);
+        try escrow.claim(rewardCampaign[k], rewardIds[k]) {
+            if (++timesPaid[rewardIds[k]] > 1 || token.balanceOf(recipient) - balance != amount) doublePaid = true;
+            if (before == CampaignEscrow.Status.Objected) objectedPaid = true;
+            if (block.timestamp < claimableAt) badTiming = true;
+            hits["claim"]++;
+        } catch {}
+    }
+    function refund(uint256 seed) external {
+        if (campaigns.length == 0) return;
+        bytes32 c = campaigns[seed % campaigns.length];
+        vm.prank(_owner(c));
+        try escrow.refundUnused(c) { hits["refund"]++; } catch {}
+    }
+    function warp(uint256 secs) external {
+        vm.warp(block.timestamp + bound(secs, 0, 4 days));
+    }
+}
+
+contract CampaignEscrowInvariants is Bounded {
+    CampaignEscrowHandler handler;
+    CampaignEscrow escrow;
+    InvToken token;
+
+    function setUp() public {
+        vm.warp(1_800_000_000);
+        token = new InvToken();
+        escrow = new CampaignEscrow(address(token), 2 days);
+        handler = new CampaignEscrowHandler(escrow, token);
+    }
+
+    function targetContracts() public view returns (address[] memory targets) {
+        targets = new address[](1);
+        targets[0] = address(handler);
+    }
+
+    function targetSelectors() public view returns (FuzzSelector[] memory) {
+        CampaignEscrowHandler h = handler;
+        bytes4[] memory s = new bytes4[](7);
+        s[0] = h.create.selector; s[1] = h.setAgent.selector; s[2] = h.queue.selector; s[3] = h.object.selector;
+        s[4] = h.claim.selector; s[5] = h.refund.selector; s[6] = h.warp.selector;
+        return _only(address(h), s);
+    }
+
+    /// Every token the escrow holds is either available to its funder or reserved for a waiting reward.
+    function invariant_balanceMatchesCampaigns() public view {
+        uint256 total;
+        for (uint256 k; k < handler.campaignCount(); k++) {
+            (,,, uint256 available, uint256 reserved,,,,, uint256 slots, uint256 queued,) = escrow.campaigns(handler.campaigns(k));
+            require(queued <= slots, "more rewards than slots");
+            total += available + reserved;
+        }
+        require(token.balanceOf(address(escrow)) == total, "escrow balance drifted from campaigns");
+    }
+
+    /// Each campaign's reserved money equals its waiting rewards, its count equals waiting plus paid rewards,
+    /// and no recipient holds more than one waiting or paid reward in a campaign.
+    function invariant_accountingMatchesRewards() public view {
+        for (uint256 k; k < handler.campaignCount(); k++) _checkCampaign(handler.campaigns(k));
+    }
+    function _checkCampaign(bytes32 c) private view {
+        uint256 held; uint256 live;
+        uint256[4] memory perRecipient;
+        for (uint256 j; j < handler.rewardCount(); j++) {
+            if (handler.rewardCampaign(j) != c) continue;
+            (uint256 amount, uint256 r, CampaignEscrow.Status s) = _reward(c, handler.rewardIds(j));
+            if (s == CampaignEscrow.Status.Held) held += amount;
+            if (s == CampaignEscrow.Status.Held || s == CampaignEscrow.Status.Paid) { live++; perRecipient[r]++; }
+        }
+        (,,,, uint256 reserved,,,,,, uint256 queued,) = escrow.campaigns(c);
+        require(reserved == held, "reserved money differs from waiting rewards");
+        require(queued == live, "reward count differs from waiting and paid rewards");
+        for (uint256 r; r < 4; r++) require(perRecipient[r] <= 1, "recipient rewarded twice");
+    }
+    function _reward(bytes32 c, bytes32 id) private view returns (uint256 amount, uint256 index, CampaignEscrow.Status s) {
+        address recipient;
+        (recipient, amount,,,,, s) = escrow.rewards(c, id);
+        for (uint256 r; r < 4; r++) if (recipient == handler.recipients(r)) index = r;
+    }
+
+    function invariant_paidOnceExactlyAndNeverAfterObjection() public view {
+        require(!handler.doublePaid(), "reward paid twice or wrong amount");
+        require(!handler.objectedPaid(), "objected reward paid");
+    }
+
+    function invariant_onlyOwnerOrCurrentAgentApproves() public view {
+        require(!handler.unauthorizedQueue(), "stranger, removed agent or blocked recipient approved");
+        require(!handler.overTerms(), "reward above the campaign terms");
+    }
+
+    function invariant_holdTimingIsEnforced() public view {
+        require(!handler.badTiming(), "objection after the hold or payout before it");
     }
 }

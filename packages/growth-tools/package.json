@@ -42,6 +42,10 @@
       "types": "./dist/escrow.d.ts",
       "import": "./dist/escrow.js"
     },
+    "./campaign-escrow": {
+      "types": "./dist/campaign-escrow.d.ts",
+      "import": "./dist/campaign-escrow.js"
+    },
     "./commerce-abi": {
       "types": "./dist/commerce-abi.d.ts",
       "import": "./dist/commerce-abi.js"

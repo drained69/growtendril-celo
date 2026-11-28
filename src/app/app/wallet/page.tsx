@@ -54,7 +54,7 @@ export default async function WalletPage() {
   const showServerWallet = (!!wallet?.address && !contract && wallet.provider !== "altana") || (!wallet && !protocol && operatorWorkspace);
   const month = mission ? await monthUsage(db, mission) : null;
   const otherOption = !wallet && !!protocol;
-  const altanaCard = <AltanaWallet address={wallet?.address ?? null} canManage={manage} workspaceName={project.name} session={session ? {id: session.id, publicKey: session.publicKey, capUsd: fmtUsdc(session.capMicro), period: session.period, expiresAt: session.expiresAt.toISOString(), grantTxHash: session.grantTxHash, revokeTxHash: session.revokeTxHash} : null} />;
+  const altanaCard = <AltanaWallet address={wallet?.address ?? null} canManage={manage} workspaceName={project.name} takeOut={wallet?.provider === "altana" ? {canWithdraw: owner, balanceMicro: balances.walletMicro == null ? null : Number(balances.walletMicro), usdc: CELO.usdc, attributionCode: process.env.CELO_ATTRIBUTION_CODE ?? null} : undefined} session={session ? {id: session.id, publicKey: session.publicKey, capUsd: fmtUsdc(session.capMicro), period: session.period, expiresAt: session.expiresAt.toISOString(), grantTxHash: session.grantTxHash, revokeTxHash: session.revokeTxHash} : null} />;
   return <div className="space-y-4">
     <PageHeader title="Payout account" description="The money that pays people, such as creators. It stays in an account only you control, and we ask you before paying any person."
       actions={<ActionButton action={refreshSettlementsAction} label="Check for payment updates" icon={<RefreshCw />} />} />

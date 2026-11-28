@@ -2,19 +2,23 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Fingerprint, KeyRound, ShieldOff } from "lucide-react";
-import type { Address, Hex } from "viem";
+import { ArrowUpFromLine, Fingerprint, KeyRound, ShieldOff } from "lucide-react";
+import { encodeFunctionData, erc20Abi, formatUnits, getAddress, isAddress, parseUnits, type Address, type Hex } from "viem";
+import { toDataSuffix } from "@celo/attribution-tags";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select } from "@/components/ui/form";
 import { toast } from "@/components/ui/toast";
 import { useHydrated } from "@/components/ui/submit";
-import { activateAltanaSessionAction, confirmAltanaRevokeAction, prepareAltanaSessionAction, saveAltanaWalletAction } from "@/server/actions/celo-rails";
+import { activateAltanaSessionAction, confirmAltanaRevokeAction, prepareAltanaSessionAction, recordPasskeyWithdrawalAction, saveAltanaWalletAction } from "@/server/actions/celo-rails";
 import { altana, ownerFor } from "@/lib/altana-owner";
 
 export interface AltanaSessionView { id: string; publicKey: string; capUsd: string; period: string; expiresAt: string; grantTxHash: string | null; revokeTxHash: string | null }
 const TOKENS = [["cNGN", "Naira"], ["IDRX", "Rupiah"], ["wBRL", "Real"], ["wARS", "Argentine peso"], ["wMXN", "Mexican peso"], ["wCOP", "Colombian peso"]] as const;
 
-export function AltanaWallet({ address, session, canManage, workspaceName }: { address: string | null; session: AltanaSessionView | null; canManage: boolean; workspaceName: string }) {
+/** Where the owner can take money out of the passkey wallet, and what's needed to do it. */
+export interface AltanaTakeOut { canWithdraw: boolean; balanceMicro: number | null; usdc: string; attributionCode: string | null }
+
+export function AltanaWallet({ address, session, canManage, workspaceName, takeOut }: { address: string | null; session: AltanaSessionView | null; canManage: boolean; workspaceName: string; takeOut?: AltanaTakeOut }) {
   const [capUsd, setCapUsd] = useState("25");
   const [period, setPeriod] = useState<"day" | "week" | "month">("week");
   const [days, setDays] = useState("7");
@@ -88,6 +92,7 @@ export function AltanaWallet({ address, session, canManage, workspaceName }: { a
     {session.grantTxHash && <a className="text-[12px] underline" href={`https://celoscan.io/tx/${session.grantTxHash}`} target="_blank" rel="noreferrer">See proof on Celoscan</a>}
     <div><Button variant="danger" icon={<ShieldOff />} loading={pending} disabled={locked} onClick={revoke}>Take back GrowTendril&apos;s key</Button></div>
     {error && <p role="alert" className="text-[12px] text-critical">{error}</p>}
+    {takeOut && <TakeOut address={address} {...takeOut} />}
   </div>;
 
   return <div className="space-y-4">
@@ -103,5 +108,77 @@ export function AltanaWallet({ address, session, canManage, workspaceName }: { a
     <Button variant="primary" icon={<KeyRound />} loading={pending} disabled={locked} onClick={grant}>Give GrowTendril a limited key</Button>
     {expired && <p className="text-[12px] text-ink-3">GrowTendril&apos;s last key has expired and can no longer spend. Give it a new one to keep paying people.</p>}
     {error && <p role="alert" className="text-[12px] text-critical">{error}</p>}
+    {takeOut && <TakeOut address={address} {...takeOut} />}
+  </div>;
+}
+
+/** The owner sends USDC out of their passkey wallet. Only their passkey can sign it. */
+function TakeOut({ address, canWithdraw, balanceMicro, usdc, attributionCode }: { address: string } & AltanaTakeOut) {
+  const [amount, setAmount] = useState("");
+  const [to, setTo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  const router = useRouter();
+  const hydrated = useHydrated();
+  const validAmount = /^\d{1,7}(\.\d{1,6})?$/.test(amount.trim()) && Number(amount) > 0;
+  const micro = validAmount ? Number(parseUnits(amount.trim(), 6)) : 0;
+  const over = balanceMicro != null && micro > balanceMicro;
+  const target = to.trim();
+  const validTo = isAddress(target) && target.toLowerCase() !== address.toLowerCase();
+  const locked = !hydrated || !canWithdraw || busy;
+
+  const send = () => start(async () => {
+    setError(null);
+    if (!window.confirm(`Send ${amount.trim()} USDC from this passkey wallet to ${target}?\n\nCheck the address carefully: money sent to the wrong address can't be brought back.`)) return;
+    let submitted = false;
+    try {
+      const { sdk, client, owner } = await ownerFor(address);
+      const data = encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [getAddress(target), parseUnits(amount.trim(), 6)] });
+      const tag = attributionCode ? toDataSuffix(attributionCode).slice(2) : "";
+      submitted = true;
+      // The network fee is paid in CELO if the wallet holds some, otherwise in USDC.
+      const result = await client.execute({ wallet: { address: address as Address }, signer: owner.signer, calls: [{ to: usdc as Address, data: `${data}${tag}` as Hex }], feeToken: [sdk.NATIVE_TOKEN, usdc as Address] });
+      if (result.status === "FAILED") throw new Error("Altana reported that the transfer failed. No USDC moved.");
+      if (!result.transactionHash) {
+        toast.info("Sent", "Celo hasn't confirmed it yet. Check the balance here in a minute before trying again.");
+        router.refresh();
+        return;
+      }
+      const r = await recordPasskeyWithdrawalAction(result.transactionHash);
+      if (!r.ok) throw new Error(r.error);
+      toast.success(r.message ?? "Sent");
+      setAmount("");
+      router.refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const cancelled = (e as { name?: string }).name === "NotAllowedError" || /reject|denied|cancel|not allowed/i.test(msg);
+      if (cancelled) return;
+      const text = submitted && !/failed/i.test(msg) ? `We couldn't confirm the transfer: ${msg.slice(0, 160)}. Check the balance before trying again.` : msg.slice(0, 220);
+      setError(text);
+      toast.error("Money wasn't taken out", text);
+    }
+  });
+
+  return <div className="space-y-3 border-t border-line pt-4">
+    <div>
+      <div className="text-[13px] font-medium text-ink">Take money out</div>
+      <p className="mt-0.5 text-[12px] text-ink-3">Send USDC from this wallet to another wallet you own, such as MetaMask or MiniPay. You confirm it with your passkey. A tiny network fee is paid in CELO if the wallet has some, otherwise in USDC.</p>
+    </div>
+    {canWithdraw ? <>
+      <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+        <Field label="Amount · USDC" htmlFor="altana-out-amount" error={over ? "That's more than the wallet holds." : null}>
+          <div className="flex gap-2">
+            <Input id="altana-out-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1.00" className="num" disabled={locked} />
+            {balanceMicro != null && balanceMicro > 0 && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => setAmount(formatUnits(BigInt(balanceMicro), 6))}>All</Button>}
+          </div>
+        </Field>
+        <Field label="Send to (a wallet address you own)" htmlFor="altana-out-to" error={target && !isAddress(target) ? "That isn't a valid wallet address." : target && target.toLowerCase() === address.toLowerCase() ? "That's this wallet's own address." : null}>
+          <Input id="altana-out-to" value={to} onChange={(e) => setTo(e.target.value)} placeholder="0x…" className="num" disabled={locked} />
+        </Field>
+      </div>
+      <Button icon={<ArrowUpFromLine />} loading={busy} disabled={locked || !validAmount || over || !validTo} onClick={send}>Take money out</Button>
+      {balanceMicro != null && micro > 0 && micro === balanceMicro && <p className="text-[11.5px] text-ink-3">Taking everything out works only if the wallet has a little CELO for the fee. If it fails, leave a few cents of USDC behind.</p>}
+      {error && <p role="alert" className="text-[12px] text-critical">{error}</p>}
+    </> : <p className="text-[12px] text-ink-3">Only the workspace owner can take money out.</p>}
   </div>;
 }

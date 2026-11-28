@@ -2,11 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
-import { getAddress, isAddress, type Address } from "viem";
+import { erc20Abi, getAddress, isAddress, parseEventLogs, type Address, type Hash } from "viem";
 import { z } from "zod";
 import { schema as s } from "@/server/db/client";
 import { audit } from "@/server/db/helpers";
-import { toMicro } from "@/lib/money";
+import { fmtUsdc, toMicro } from "@/lib/money";
+import { newId } from "@/server/lib/ids";
+import { publicClient } from "@/server/integrations/celo/client";
+import { CELO } from "@/server/integrations/celo/config";
+import { resolveByRef } from "@/server/domain/reconcile/exceptions";
 import { fail, guard, limited, type ActionResult } from "@/server/actions/_common";
 import { keyIsOnAccount, prepareSession, sessionGrant, type SessionGrant } from "@/server/integrations/celo/altana";
 import { formatPayout, isPayoutToken, PAYOUT_TOKEN_KEYS, type PayoutToken } from "@/server/integrations/celo/corridors";
@@ -146,6 +150,38 @@ export async function previewPayoutAction(token: string, amountUsd: string): Pro
     const price = await previewCorridor(token, BigInt(toMicro(amountUsd)));
     if (!price.buyAmount) return { ok: false, error: "No Textile FX maker is pricing this corridor right now" };
     return { ok: true, data: { receives: formatPayout(token, price.buyAmount) } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * The owner took money out of their passkey wallet. The passkey signs in the browser; this only
+ * reads the transfer back from Celo and records it, so the wallet check doesn't flag the owner's
+ * own withdrawal as money leaving with no matching payment.
+ */
+export async function recordPasskeyWithdrawalAction(txHash: string): Promise<ActionResult> {
+  try {
+    const { project, db, user } = await guard("manage_workspace");
+    if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return { ok: false, error: "That doesn't look like a Celo transaction." };
+    const wallet = await getWallet(db, project.id);
+    if (wallet?.provider !== "altana" || !wallet.address) return { ok: false, error: "This workspace doesn't use a passkey wallet." };
+    const from = wallet.address.toLowerCase();
+    const receipt = await publicClient().waitForTransactionReceipt({ hash: txHash as Hash, timeout: 60_000 }).catch(() => null);
+    const outs = receipt
+      ? parseEventLogs({ abi: erc20Abi, eventName: "Transfer", logs: receipt.logs }).filter((l) => l.address.toLowerCase() === CELO.usdc.toLowerCase() && l.args.from.toLowerCase() === from)
+      : [];
+    if (!outs.length) return { ok: true, message: "Sent. Celo hasn't shown it yet; if it later appears on this page as something to look at, mark it resolved." };
+    const total = outs.reduce((n, l) => n + Number(l.args.value), 0);
+    const to = outs[0].args.to;
+    const ref = txHash.toLowerCase();
+    const note = `The owner took ${fmtUsdc(total)} out of the passkey wallet to ${to}.`;
+    await db.insert(s.ledgerExceptions).values({ id: newId(), scope: "wallet", projectId: project.id, kind: "unrecorded_outflow", ref, txHash, amountMicro: total, counterparty: to, detail: note, status: "resolved", resolution: note, resolvedBy: user.id, resolvedAt: new Date() }).onConflictDoNothing();
+    // The wallet check may have flagged it first; close that with the same note.
+    await resolveByRef(db, "unrecorded_outflow", ref, note);
+    await audit(db, { projectId: project.id, actorType: "user", actorId: user.id, action: "wallet.altana_withdraw", target: txHash, data: { amountMicro: total, to } });
+    revalidatePath("/app/wallet");
+    return { ok: true, message: `${fmtUsdc(total)} sent to ${to.slice(0, 6)}…${to.slice(-4)}` };
   } catch (e) {
     return fail(e);
   }

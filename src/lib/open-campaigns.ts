@@ -3,7 +3,7 @@
  * from CampaignEscrow on Celo. Client-safe: no server imports, so pages and the browser share one
  * definition of the terms, the hashes and the contract interface.
  */
-import { encodeAbiParameters, keccak256, parseAbi, toHex, type Address, type Hex } from "viem";
+import { encodeAbiParameters, keccak256, toHex, type Address, type Hex } from "viem";
 import { z } from "zod";
 import { fmtUsdc, microToDecimal, toMicro } from "@/lib/money";
 
@@ -100,29 +100,8 @@ export function agreementMessage(a: { title: string; business: string; slug: str
   ].join("\n");
 }
 
-// ── CampaignEscrow (hand-written until the contract package lands on main) ──
-export const CAMPAIGN_ESCROW_ABI = parseAbi([
-  "function token() view returns (address)",
-  "function refundHold() view returns (uint256)",
-  "function REVIEW_WINDOW() view returns (uint256)",
-  "function campaignKey(address owner, bytes32 salt) pure returns (bytes32)",
-  "function campaigns(bytes32) view returns (address owner, address agent, uint256 deadline, uint256 available, uint256 reserved, uint256 base, uint256 qualityBonus, uint256 outcomeBonus, uint256 outcomeCap, uint256 slots, uint256 queued, bytes32 termsHash)",
-  "function rewards(bytes32, bytes32) view returns (address recipient, uint256 amount, uint256 quality, uint256 outcomes, uint256 claimableAt, bytes32 evidenceHash, uint8 status)",
-  "function hasReward(bytes32, address) view returns (bool)",
-  "function objectedTo(bytes32, address) view returns (bool)",
-  "function createCampaign(bytes32 salt, address agent, uint256 deadline, uint256 budget, uint256 base, uint256 qualityBonus, uint256 outcomeBonus, uint256 outcomeCap, uint256 slots, bytes32 termsHash)",
-  "function setAgent(bytes32 id, address agent)",
-  "function queueReward(bytes32 id, bytes32 rewardId, address recipient, uint256 quality, uint256 outcomes, bytes32 evidenceHash)",
-  "function object(bytes32 id, bytes32 rewardId, bytes32 reasonHash)",
-  "function claim(bytes32 id, bytes32 rewardId)",
-  "function refundUnused(bytes32 id)",
-  "event CampaignFunded(bytes32 indexed campaignId, address indexed owner, uint256 amount, bytes32 termsHash, address agent)",
-  "event AgentChanged(bytes32 indexed campaignId, address agent)",
-  "event RewardQueued(bytes32 indexed campaignId, bytes32 indexed rewardId, address recipient, uint256 amount, bytes32 evidenceHash, address queuedBy)",
-  "event RewardObjected(bytes32 indexed campaignId, bytes32 indexed rewardId, bytes32 reasonHash)",
-  "event RewardPaid(bytes32 indexed campaignId, bytes32 indexed rewardId, address recipient, uint256 amount)",
-  "event UnusedRefunded(bytes32 indexed campaignId, uint256 amount)",
-]);
+// ── CampaignEscrow (contracts/src/CampaignEscrow.sol, deployed on Celo mainnet) ──
+export { CAMPAIGN_ESCROW_ABI, isCampaignEscrowCode } from "@growth-tools/campaign-escrow";
 export const REWARD_STATUS = ["None", "Held", "Paid", "Objected"] as const;
 export type RewardStatus = (typeof REWARD_STATUS)[number];
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;

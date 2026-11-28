@@ -6,7 +6,7 @@ import { Button, Input } from "@/components/ui";
 import { toast } from "@/components/ui/toast";
 import { celoReader, connectCelo, sendCelo, walletError } from "@/lib/celo-browser";
 import { fmtUsdc } from "@/lib/money";
-import { CAMPAIGN_ESCROW_ABI, CELO_USDC, OPEN_HOLD_SECONDS, OPEN_REVIEW_WINDOW_SECONDS, ZERO_ADDRESS, openCampaignKey, openReasonHash } from "@/lib/open-campaigns";
+import { CAMPAIGN_ESCROW_ABI, CELO_USDC, isCampaignEscrowCode, OPEN_HOLD_SECONDS, OPEN_REVIEW_WINDOW_SECONDS, ZERO_ADDRESS, openCampaignKey, openReasonHash } from "@/lib/open-campaigns";
 import {
   confirmOpenAgentAction, confirmOpenFundingAction, confirmOpenObjectionAction, confirmOpenRefundAction, prepareOpenFundingAction, syncMyClaimAction, syncOwnerClaimAction,
 } from "@/server/actions/open-campaigns";
@@ -18,7 +18,7 @@ const same = (a?: string | null, b?: string | null) => !!a && !!b && a.toLowerCa
 /** Checks, in the browser and before any money moves, that the address really is the campaign contract. */
 export async function checkCampaignContract(contract: Address) {
   const code = await celoReader.getCode({ address: contract });
-  if (!code || code === "0x") throw new Error("There's no campaign contract at this address. Nothing was sent.");
+  if (!code || !isCampaignEscrowCode(code)) throw new Error("This address doesn't hold GrowTendril's reviewed campaign contract. Nothing was sent.");
   const [token, hold, window] = await Promise.all([
     celoReader.readContract({ address: contract, abi: CAMPAIGN_ESCROW_ABI, functionName: "token" }),
     celoReader.readContract({ address: contract, abi: CAMPAIGN_ESCROW_ABI, functionName: "refundHold" }),

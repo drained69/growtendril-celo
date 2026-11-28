@@ -1,5 +1,5 @@
 import { getAddress, isAddress, type Address, type Hex } from "viem";
-import { CAMPAIGN_ESCROW_ABI, OPEN_HOLD_SECONDS, OPEN_REVIEW_WINDOW_SECONDS, REWARD_STATUS, type OnchainCampaign, type OnchainReward } from "@/lib/open-campaigns";
+import { CAMPAIGN_ESCROW_ABI, isCampaignEscrowCode, OPEN_HOLD_SECONDS, OPEN_REVIEW_WINDOW_SECONDS, REWARD_STATUS, type OnchainCampaign, type OnchainReward } from "@/lib/open-campaigns";
 import { operatorAccount, operatorProblem, operatorWalletClient, publicClient } from "./client";
 import { CELO } from "./config";
 
@@ -18,8 +18,8 @@ export function openAgentAddress(): Address | null {
 
 const verified = new Map<string, Promise<void>>();
 /**
- * Interim code check until the reviewed runtime hash ships on main: the address must hold code that
- * answers like CampaignEscrow, with Celo USDC, a 72-hour hold and a 7-day review window.
+ * The address must hold the reviewed CampaignEscrow runtime, deployed with Celo USDC, a 72-hour hold
+ * and a 7-day review window. Checked once per process; a failed check is retried next time.
  */
 export function assertCampaignEscrow(contract: Address): Promise<void> {
   const key = contract.toLowerCase();
@@ -27,7 +27,7 @@ export function assertCampaignEscrow(contract: Address): Promise<void> {
     const check = (async () => {
       const client = publicClient();
       const code = await client.getCode({ address: contract });
-      if (!code || code === "0x") throw new Error("There is no campaign contract at the configured address");
+      if (!code || !isCampaignEscrowCode(code)) throw new Error("The configured address doesn't hold GrowTendril's reviewed campaign contract");
       const [token, hold, window] = await Promise.all([
         client.readContract({ address: contract, abi: CAMPAIGN_ESCROW_ABI, functionName: "token" }),
         client.readContract({ address: contract, abi: CAMPAIGN_ESCROW_ABI, functionName: "refundHold" }),
